@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#f5f5ef" />
+    <meta name="description" content="简单、快速的 Card 金额计算器，输入金额即可查看精确合计。" />
+    <title>Card 结算 · NO.3</title>
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./styles.css" />
+    <script type="module" src="./app.js"></script>
+  </head>
+  <body>
+    <main class="calculator">
+      <header class="page-header">
+        <div>
+          <p class="eyebrow"><span class="brand-mark" aria-hidden="true"></span> NO.3 <span class="eyebrow-divider">/</span> DAILY TOOLS</p>
+          <h1>Card 结算<span class="title-dot">.</span></h1>
+          <p class="subtitle">输入金额，即时计算</p>
+        </div>
+        <button class="reset-button" type="reset" form="calculator-form" id="reset-button" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 10a8 8 0 1 1 1.8 7.1M4 4v6h6" stroke-linecap="round" stroke-linejoin="round" /></svg>
+          清空
+        </button>
+      </header>
+
+      <form id="calculator-form" novalidate autocomplete="off">
+        <div class="section-heading">
+          <h2>输入金额</h2>
+          <p id="amount-hint">0–20,000 · 最多 2 位小数</p>
+        </div>
+
+        <div class="fields">
+          <div class="field" id="morning-field">
+            <span class="operator" aria-hidden="true">+</span>
+            <div class="field-content">
+              <label for="morning">上午<span lang="en">card</span></label>
+              <input id="morning" name="morning" type="text" inputmode="decimal" enterkeyhint="next" placeholder="0.00" aria-describedby="amount-hint morning-error" spellcheck="false" autocapitalize="off" />
+              <p class="field-error" id="morning-error" hidden></p>
+            </div>
+            <span class="field-index" aria-hidden="true">01</span>
+          </div>
+
+          <div class="field" id="current-field">
+            <span class="operator" aria-hidden="true">+</span>
+            <div class="field-content">
+              <label for="current">当前<span lang="en">card</span></label>
+              <input id="current" name="current" type="text" inputmode="decimal" enterkeyhint="next" placeholder="0.00" aria-describedby="amount-hint current-error" spellcheck="false" autocapitalize="off" />
+              <p class="field-error" id="current-error" hidden></p>
+            </div>
+            <span class="field-index" aria-hidden="true">02</span>
+          </div>
+
+          <div class="field" id="overcharged-field">
+            <span class="operator" aria-hidden="true">+</span>
+            <div class="field-content">
+              <label for="overcharged">多收客人<span lang="en">card</span></label>
+              <input id="overcharged" name="overcharged" type="text" inputmode="decimal" enterkeyhint="next" placeholder="0.00" aria-describedby="amount-hint overcharged-error" spellcheck="false" autocapitalize="off" />
+              <p class="field-error" id="overcharged-error" hidden></p>
+            </div>
+            <span class="field-index" aria-hidden="true">03</span>
+          </div>
+
+          <div class="field field-subtract" id="undercharged-field">
+            <span class="operator" aria-hidden="true">−</span>
+            <div class="field-content">
+              <label for="undercharged">少收客人<span lang="en">card</span></label>
+              <input id="undercharged" name="undercharged" type="text" inputmode="decimal" enterkeyhint="done" placeholder="0.00" aria-describedby="amount-hint undercharged-error" spellcheck="false" autocapitalize="off" />
+              <p class="field-error" id="undercharged-error" hidden></p>
+            </div>
+            <span class="field-index" aria-hidden="true">04</span>
+          </div>
+        </div>
+      </form>
+
+      <section class="result-card" aria-labelledby="result-heading">
+        <div class="result-heading">
+          <h2 id="result-heading">计算结果</h2>
+          <span class="live-badge"><span aria-hidden="true"></span>实时合计</span>
+        </div>
+        <output id="result" for="morning current overcharged undercharged" aria-live="polite" aria-atomic="true">0.00</output>
+        <div class="result-details">
+          <p class="formula-label"><span>上午card + 当前card</span><span>+ 多收客人card − 少收客人card</span></p>
+          <p class="formula-values" id="formula-values">0.00 + 0.00 + 0.00 − 0.00 = 0.00</p>
+        </div>
+      </section>
+
+      <footer class="page-footer">
+        <p><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m4 8 2.5 2.5L12 5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" /></svg>精确到分<span>·</span>空白按 0 计算</p>
+        <button class="copy-button" id="copy-button" type="button">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="7" y="7" width="9" height="10" rx="2" /><path d="M12 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2" /></svg>
+          <span id="copy-label">复制结果</span>
+        </button>
+      </footer>
+      <p class="action-status" id="action-status" role="status"></p>
+      <noscript><p class="noscript-message">请开启浏览器的 JavaScript 以使用计算器。</p></noscript>
+    </main>
+  </body>
+</html>
