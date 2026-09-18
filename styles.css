@@ -69,6 +69,8 @@ h1 { font-size: 34px; font-weight: 650; letter-spacing: -1.2px; line-height: 1.2
 .page-footer p span { color: #99a18f; }
 .copy-button { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 0 4px 0 8px; border: 0; border-radius: 8px; background: transparent; color: #3f634a; font-size: 12px; }
 .copy-button svg { width: 16px; height: 16px; }
+.storage-status { color: var(--muted); font-size: 12px; line-height: 1.5; }
+.storage-status.storage-warning { color: #a23926; }
 .action-status { min-height: 16px; color: #596851; font-size: 12px; text-align: right; }
 .noscript-message { margin-top: 12px; color: #a23926; font-size: 14px; }
 
