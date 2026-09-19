@@ -10,6 +10,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body { margin: 0; }
 button, input { font: inherit; }
 button { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
@@ -26,7 +27,7 @@ p, h1, h2 { margin: 0; }
   margin: 0 auto;
   padding: max(28px, env(safe-area-inset-top)) 20px max(16px, env(safe-area-inset-bottom));
 }
-.page-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 26px; }
+.page-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
 .eyebrow { display: flex; align-items: center; gap: 8px; font-size: 10px; font-weight: 700; letter-spacing: 1.5px; }
 .brand-mark { width: 10px; height: 10px; background: var(--green); border-radius: 3px; transform: rotate(-12deg); }
 .eyebrow-divider { color: #a0a899; font-weight: 400; margin: 0 2px; }
@@ -35,6 +36,9 @@ h1 { font-size: 34px; font-weight: 650; letter-spacing: -1.2px; line-height: 1.2
 .subtitle { color: var(--muted); font-size: 14px; letter-spacing: .5px; }
 .reset-button { display: flex; align-items: center; gap: 7px; padding: 0 12px; min-height: 44px; border: 1px solid #dcded3; border-radius: 12px; background: transparent; color: #55624f; font-size: 14px; }
 .reset-button svg { width: 17px; height: 17px; }
+.tabs { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 2; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 5px; margin-bottom: 20px; border: 1px solid #e0e4d7; border-radius: 15px; background: #eaece2; box-shadow: 0 4px 12px #f5f5ef; }
+.tab { min-height: 44px; padding: 8px 12px; border: 0; border-radius: 10px; color: #596851; background: transparent; font-size: 15px; font-weight: 600; }
+.tab[aria-selected="true"] { color: #fff; background: var(--green); box-shadow: 0 2px 5px #214e3f16; }
 .section-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
 .section-heading h2 { font-size: 13px; font-weight: 600; }
 .section-heading p { color: var(--muted); font-size: 11px; }
@@ -43,10 +47,11 @@ h1 { font-size: 34px; font-weight: 650; letter-spacing: -1.2px; line-height: 1.2
 .field:focus-within { border-color: #63866a; box-shadow: 0 0 0 3px #214e3f0c; }
 .operator { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 34px; height: 34px; border-radius: 11px; background: #f0f4e9; color: #5b7852; font-size: 25px; font-weight: 400; }
 .field-subtract .operator { background: #fbf1e8; color: #a16e49; }
+.note-field .operator { width: 62px; height: 42px; font-size: 18px; font-weight: 650; letter-spacing: -.5px; }
 .field-content { flex: 1; min-width: 0; }
 .field label { display: block; width: fit-content; color: #5a685e; font-size: 15px; font-weight: 500; line-height: 20px; cursor: text; }
 .field label span { margin-left: 4px; font-weight: 400; }
-.field input { display: block; width: 100%; min-height: 44px; padding: 1px 0 0; border: 0; border-radius: 0; outline: none; background: transparent; color: #263e36; caret-color: var(--green); font-size: 31px; font-weight: 550; font-variant-numeric: tabular-nums; letter-spacing: -.7px; line-height: 1.2; scroll-margin-top: 16px; }
+.field input { display: block; width: 100%; min-height: 44px; padding: 1px 0 0; border: 0; border-radius: 0; outline: none; background: transparent; color: #263e36; caret-color: var(--green); font-size: 31px; font-weight: 550; font-variant-numeric: tabular-nums; letter-spacing: -.7px; line-height: 1.2; scroll-margin-top: 80px; }
 .field input::placeholder { opacity: 1; color: #b2b9ad; font-weight: 400; }
 .field-index { align-self: flex-start; color: #8c9688; font-size: 10px; line-height: 20px; font-variant-numeric: tabular-nums; }
 .field.invalid { border-color: #b8553e; }
@@ -58,11 +63,19 @@ h1 { font-size: 34px; font-weight: 650; letter-spacing: -1.2px; line-height: 1.2
 .result-heading h2 { color: #e1ece3; font-size: 14px; font-weight: 500; }
 .live-badge { display: flex; align-items: center; gap: 5px; color: #d4e5b5; font-size: 10px; letter-spacing: .5px; }
 .live-badge span { width: 5px; height: 5px; background: #d2eaa2; border-radius: 50%; }
-#result { display: block; margin: 9px 0 14px; color: #ecf5cd; font-size: clamp(39px, 12.5vw, 56px); line-height: 1.1; font-weight: 550; letter-spacing: -1.8px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.result-value { display: block; margin: 9px 0 14px; color: #ecf5cd; font-size: clamp(39px, 12.5vw, 56px); line-height: 1.1; font-weight: 550; letter-spacing: -1.8px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .result-details { border-top: 1px solid #ffffff29; padding-top: 11px; }
 .formula-label { display: flex; flex-wrap: wrap; column-gap: 4px; color: #deeadf; font-size: 12px; line-height: 1.7; }
 .formula-label span { white-space: nowrap; }
 .formula-values { margin-top: 4px; color: #b5ccbb; font-size: 12px; line-height: 1.6; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.cash-summary { display: grid; gap: 7px; padding-bottom: 12px; margin-bottom: 10px; border-bottom: 1px solid #ffffff29; }
+.cash-summary p { display: flex; justify-content: space-between; gap: 12px; color: #deeadf; font-size: 13px; font-variant-numeric: tabular-nums; }
+.balance-status { margin-top: 10px; color: #ecf5cd; font-size: 14px; }
+.subtotal-card { margin-top: 12px; padding: 18px 21px; border: 1px solid #d9e1cb; border-radius: 18px; background: #eef2e5; }
+.subtotal-card h2 { color: #456043; font-size: 14px; }
+.subtotal-denominations { color: #617157; font-size: 12px; }
+.subtotal-value { display: block; margin: 10px 0 8px; font-size: 38px; font-weight: 550; letter-spacing: -1px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.subtotal-formula { color: #617157; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
 .page-footer { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 8px; }
 .page-footer p { display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: 11px; }
 .page-footer p svg { width: 15px; height: 15px; color: #547051; }

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { calculateTotal, formatCents, parseAmount } from "../calculator.js";
+import { calculateCashTotal, calculateNoteTotals, calculateTotal, formatCents, parseAmount, parseNoteCount } from "../calculator.js";
 
 const cents = (text) => {
   const amount = parseAmount(text);
@@ -40,4 +40,58 @@ test("rejects invalid internal amounts rather than propagating an imprecise resu
     assert.throws(() => calculateTotal(invalid, 0, 0, 0), RangeError);
   }
   assert.throws(() => formatCents(0.1), TypeError);
+});
+
+test("cash subtracts all expenses and then the current drawer balance exactly once", () => {
+  const values = ["100.25", "200.50", "10.10", "20.20", "5.05", "15.15", "250.00"].map(cents);
+  const result = calculateCashTotal(...values);
+  assert.equal(formatCents(result.expectedCents), "250.25");
+  assert.equal(formatCents(result.differenceCents), "0.25");
+  assert.equal(calculateCashTotal(100, 200, 10, 20, 30, 40, 200).differenceCents, 0);
+  assert.equal(calculateCashTotal(100, 200, 10, 20, 30, 40, 201).differenceCents, -1);
+});
+
+test("cash handles boundaries and validates all seven amounts", () => {
+  assert.deepEqual(calculateCashTotal(2000000, 2000000, 0, 0, 0, 0, 0), {
+    expectedCents: 4000000, differenceCents: 4000000,
+  });
+  assert.deepEqual(calculateCashTotal(0, 0, 2000000, 2000000, 2000000, 2000000, 2000000), {
+    expectedCents: -8000000, differenceCents: -10000000,
+  });
+  for (let index = 0; index < 7; index += 1) {
+    const values = Array(7).fill(0);
+    values[index] = 2000001;
+    assert.throws(() => calculateCashTotal(...values), RangeError);
+  }
+});
+
+test("note counts accept only non-negative whole-number text", () => {
+  for (const [input, expected] of [["", 0n], ["  ", 0n], ["0", 0n], ["1", 1n], ["0002", 2n], [" 25 ", 25n]]) {
+    assert.deepEqual(parseNoteCount(input), { ok: true, count: expected });
+  }
+  for (const input of ["-1", "-0", "+1", "1.0", "0.5", ".", "1e2", "1,000", "abc", "Infinity"]) {
+    assert.equal(parseNoteCount(input).ok, false, input);
+  }
+});
+
+test("note totals include all denominations and the small-note subtotal excludes 100 and 50", () => {
+  assert.deepEqual(calculateNoteTotals([1n, 2n, 3n, 4n, 5n]), {
+    totalCents: 32500n, smallNotesCents: 12500n,
+  });
+  assert.deepEqual(calculateNoteTotals([1n, 1n, 0n, 0n, 0n]), {
+    totalCents: 15000n, smallNotesCents: 0n,
+  });
+  assert.deepEqual(calculateNoteTotals([0n, 0n, 0n, 0n, 0n]), {
+    totalCents: 0n, smallNotesCents: 0n,
+  });
+  assert.throws(() => calculateNoteTotals([0n, 0n, -1n, 0n, 0n]), RangeError);
+  assert.throws(() => calculateNoteTotals([0, 0, 0, 0, 0]), RangeError);
+});
+
+test("large note counts and currency formatting remain exact", () => {
+  const count = parseNoteCount("9007199254740993");
+  assert.equal(count.ok, true);
+  const totals = calculateNoteTotals([count.count, 0n, 0n, 0n, 0n]);
+  assert.equal(formatCents(totals.totalCents, true), "900,719,925,474,099,300.00");
+  assert.equal(formatCents(-1n), "−0.01");
 });
