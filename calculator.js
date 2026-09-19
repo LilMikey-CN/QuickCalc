@@ -37,7 +37,7 @@ function validateAmounts(amounts) {
 
 export function calculateCashTotal(morning, current, delivery, retained, extraChange, expenses, drawer) {
   validateAmounts([morning, current, delivery, retained, extraChange, expenses, drawer]);
-  const expectedCents = morning + current - delivery - retained - extraChange - expenses;
+  const expectedCents = morning + current - delivery + retained - extraChange - expenses;
   return { expectedCents, differenceCents: expectedCents - drawer };
 }
 

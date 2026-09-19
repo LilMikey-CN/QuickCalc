@@ -3,7 +3,7 @@
 A small mobile-first calculator with three tabs:
 
 - **Card:** 上午 + 当前 + 多收客人 − 少收客人.
-- **现金:** 上午系统现金 + 当前系统现金 − 配送现金 − 昨日留存 − 多找客人现金 − 其他支出 − 当前钱箱余额. The result shows the signed difference (expected cash minus the drawer balance), with the expected balance and drawer balance shown separately. Positive means the drawer is short; negative means it has extra cash.
+- **现金:** 上午系统现金 + 当前系统现金 − 配送现金 + 昨日留存 − 多找客人现金 − 其他支出 − 当前钱箱余额. The result shows the signed difference (expected cash minus the drawer balance), with the expected balance and drawer balance shown separately. Positive means the drawer is short; negative means it has extra cash.
 - **点钞:** Enter the number of Australian $100, $50, $20, $10, and $5 notes. See the total value in AUD and a separate subtotal for the $20/$10/$5 notes using the same counts. Counts must be non-negative whole numbers; decimals, negatives, and exponent notation are rejected. Integer arithmetic keeps even very large note counts exact.
 
 - Card and cash inputs accept 0–20,000 with up to two decimal places. Empty inputs in every tab count as zero.

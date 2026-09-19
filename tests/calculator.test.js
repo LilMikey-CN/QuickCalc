@@ -42,21 +42,21 @@ test("rejects invalid internal amounts rather than propagating an imprecise resu
   assert.throws(() => formatCents(0.1), TypeError);
 });
 
-test("cash subtracts all expenses and then the current drawer balance exactly once", () => {
+test("cash adds retained cash, subtracts expenses and then the drawer balance exactly once", () => {
   const values = ["100.25", "200.50", "10.10", "20.20", "5.05", "15.15", "250.00"].map(cents);
   const result = calculateCashTotal(...values);
-  assert.equal(formatCents(result.expectedCents), "250.25");
-  assert.equal(formatCents(result.differenceCents), "0.25");
-  assert.equal(calculateCashTotal(100, 200, 10, 20, 30, 40, 200).differenceCents, 0);
-  assert.equal(calculateCashTotal(100, 200, 10, 20, 30, 40, 201).differenceCents, -1);
+  assert.equal(formatCents(result.expectedCents), "290.65");
+  assert.equal(formatCents(result.differenceCents), "40.65");
+  assert.equal(calculateCashTotal(100, 200, 10, 20, 30, 40, 240).differenceCents, 0);
+  assert.equal(calculateCashTotal(100, 200, 10, 20, 30, 40, 241).differenceCents, -1);
 });
 
 test("cash handles boundaries and validates all seven amounts", () => {
-  assert.deepEqual(calculateCashTotal(2000000, 2000000, 0, 0, 0, 0, 0), {
-    expectedCents: 4000000, differenceCents: 4000000,
+  assert.deepEqual(calculateCashTotal(2000000, 2000000, 0, 2000000, 0, 0, 0), {
+    expectedCents: 6000000, differenceCents: 6000000,
   });
-  assert.deepEqual(calculateCashTotal(0, 0, 2000000, 2000000, 2000000, 2000000, 2000000), {
-    expectedCents: -8000000, differenceCents: -10000000,
+  assert.deepEqual(calculateCashTotal(0, 0, 2000000, 0, 2000000, 2000000, 2000000), {
+    expectedCents: -6000000, differenceCents: -8000000,
   });
   for (let index = 0; index < 7; index += 1) {
     const values = Array(7).fill(0);
