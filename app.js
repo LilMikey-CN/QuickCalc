@@ -16,15 +16,15 @@ const configurations = {
     title: "现金核对", subtitle: "核对应有现金与钱箱余额", resultTitle: "现金差额",
     storageKey: "no3-cash-calculator:amounts:v1",
     fields: [
-      { id: "cash-morning", label: "上午系统现金", sign: "+" },
-      { id: "cash-current", label: "当前系统现金", sign: "+" },
-      { id: "cash-delivery", label: "配送现金", sign: "−" },
-      { id: "cash-retained", label: "昨日留存", sign: "+" },
-      { id: "cash-extra-change", label: "多找客人现金", sign: "−" },
-      { id: "cash-expenses", label: "其他支出", sign: "−" },
-      { id: "cash-drawer", label: "当前钱箱余额", sign: "−" },
+      { id: "cash-drawer", label: "当前钱箱余额", sign: "+" },
+      { id: "cash-morning", label: "上午系统现金", sign: "−" },
+      { id: "cash-current", label: "当前系统现金", sign: "−" },
+      { id: "cash-retained", label: "昨日留存", sign: "−" },
+      { id: "cash-delivery", label: "配送现金", sign: "+" },
+      { id: "cash-extra-change", label: "多找客人现金", sign: "+" },
+      { id: "cash-expenses", label: "其他支出", sign: "+" },
     ],
-    formula: "上午系统现金 + 当前系统现金 − 配送现金 + 昨日留存 − 多找客人现金 − 其他支出 − 当前钱箱余额",
+    formula: "当前钱箱余额 − 上午系统现金 − 当前系统现金 − 昨日留存 + 配送现金 + 多找客人现金 + 其他支出 = 现金差额",
   },
   notes: {
     title: "澳元点钞", subtitle: "输入张数，快速合计", resultTitle: "纸币总额 · AUD",
@@ -177,9 +177,9 @@ function createCalculator(name, config) {
         const totals = calculateCashTotal(...cents);
         currentTotal = totals.differenceCents;
         get(".expected-value").textContent = formatCents(totals.expectedCents, true);
-        get(".drawer-value").textContent = formatCents(cents[6], true);
+        get(".drawer-value").textContent = formatCents(cents[0], true);
         get(".balance-status").textContent = currentTotal === 0 ? "账实相符" : currentTotal > 0
-          ? `钱箱少 ${formatCents(currentTotal, true)}` : `钱箱多 ${formatCents(-currentTotal, true)}`;
+          ? `钱箱多 ${formatCents(currentTotal, true)}` : `钱箱少 ${formatCents(-currentTotal, true)}`;
       } else currentTotal = calculateTotal(...cents);
       get(".formula-values").textContent = cents.map((amount, index) => `${index ? `${config.fields[index].sign} ` : ""}${formatCents(amount, true)}`).join(" ") + ` = ${formatCents(currentTotal, true)}`;
     }

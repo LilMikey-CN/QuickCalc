@@ -35,10 +35,10 @@ function validateAmounts(amounts) {
   }
 }
 
-export function calculateCashTotal(morning, current, delivery, retained, extraChange, expenses, drawer) {
-  validateAmounts([morning, current, delivery, retained, extraChange, expenses, drawer]);
-  const expectedCents = morning + current - delivery + retained - extraChange - expenses;
-  return { expectedCents, differenceCents: expectedCents - drawer };
+export function calculateCashTotal(drawer, morning, current, retained, delivery, extraChange, expenses) {
+  validateAmounts([drawer, morning, current, retained, delivery, extraChange, expenses]);
+  const expectedCents = morning + current + retained - delivery - extraChange - expenses;
+  return { expectedCents, differenceCents: drawer - expectedCents };
 }
 
 /** Counts remain integers even beyond Number.MAX_SAFE_INTEGER. */
