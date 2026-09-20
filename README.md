@@ -4,7 +4,7 @@ A small mobile-first calculator with three tabs:
 
 - **Card:** Starts with 早班 and 晚班, each with its own **添加补充记录** button and copyable subtotal. The result is 早班合计 + 晚班合计 + 多收客人 − 少收客人. **客人金额调整** optionally reveals the two customer adjustments.
 - **点钞:** Enter the number of Australian $100, $50, $20, $10, and $5 notes. See the total value in AUD and a separate subtotal for the $20/$10/$5 notes using the same counts. Counts must be non-negative whole numbers; decimals, negatives, and exponent notation are rejected. Integer arithmetic keeps even very large note counts exact.
-- **现金:** 钱箱余额 − 系统现金总和 − 昨日留存 − 现金支出调整 = 现金差额. Both 早班系统现金 and 晚班系统现金 support supplementary records and copyable subtotals. 系统现金总和 includes both shifts and all their supplementary records. **现金支出调整** optionally reveals 配送现金, 银行转账多找客人, 人民币支付多找客人, Card 支付多找客人, and 其他支出. Positive differences mean the drawer has extra cash; negative differences mean it is short.
+- **现金:** 钱箱余额 − 系统现金总和 − 昨日留存 + 现金支出调整 = 现金差额. Both 早班系统现金 and 晚班系统现金 support supplementary records and copyable subtotals. 系统现金总和 includes both shifts and all their supplementary records. **现金支出调整** optionally reveals 配送现金, 银行转账多找客人, 人民币支付多找客人, Card 支付多找客人, and 其他支出. Positive differences mean the drawer has extra cash; negative differences mean it is short.
 
 - **钱箱余额** is read-only and automatically follows **纸币总额** from 点钞. Change note counts to update it; the cash difference recalculates immediately. Invalid note counts withhold the linked balance and cash result until corrected.
 - Editable card and cash inputs accept 0–20,000 with up to two decimal places. The linked drawer balance supports the full note total, including totals above 20,000. Empty inputs in every tab count as zero.
@@ -20,7 +20,7 @@ Both Card and 现金 support separate early- and late-shift rows named 早班补
 
 Rows, order, raw input text, and adjustments save automatically. Existing saved Card and cash values migrate to the new format. Saved nonzero or invalid adjustments automatically open their section on restore; collapsing that section keeps entered adjustments included, with a visible status beside the heading.
 
-Cash adjustment amounts are entered in AUD, including the cash refunded for RMB overpayments; the app does not convert currencies. All five categories, plus any migrated unclassified change, are subtracted from the cash difference. **复制全部调整记录** copies only nonzero adjustments, one per line, ready to paste into a message:
+Cash adjustment amounts are entered in AUD, including the cash refunded for RMB overpayments; the app does not convert currencies. All five categories add back to the cash difference. **复制全部调整记录** copies only nonzero adjustments, one per line, ready to paste into a message:
 
 ```text
 银行转账多收客人$10, 现金少$10

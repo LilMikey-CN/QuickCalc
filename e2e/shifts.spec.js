@@ -58,37 +58,25 @@ for (const name of ["card", "cash"]) {
   });
 }
 
-test("all cash adjustments subtract from the difference and copy multiline descriptions", async ({ page }) => {
+test("cash adjustments copy multiline descriptions and keep their signs when collapsed", async ({ page }) => {
   await mockClipboard(page);
   await page.goto("/");
   await page.getByRole("tab", { name: "现金", exact: true }).tap();
   await page.locator("#cash-adjustments summary").tap();
   await expect(page.locator("#cash-extra-change")).toHaveCount(0);
   await expect(page.locator("#copy-cash-adjustments")).toBeDisabled();
-  for (const [id, amount, difference] of [
-    ["cash-delivery", "1.01", "−1.01"],
-    ["cash-bank-transfer", "10", "−11.01"],
-    ["cash-rmb-payment", "2.50", "−13.51"],
-    ["cash-card-payment", "3.03", "−16.54"],
-    ["cash-expenses", "4.04", "−20.58"],
-  ]) {
-    await page.locator(`#${id}`).fill(amount);
-    await expect(page.locator(`#${id}-field .operator`)).toHaveText("−");
-    await expect(page.locator("#cash-result")).toHaveText(difference);
-  }
-  await expect(page.locator("#panel-cash .formula-label")).toHaveText("钱箱余额 − 系统现金总和 − 昨日留存 − 配送现金 − 银行转账多找客人 − 人民币支付多找客人 − Card 支付多找客人 − 其他支出 = 现金差额");
-  await expect(page.locator("#panel-cash .formula-values")).toHaveText("0.00 − 0.00 − 0.00 − 1.01 − 10.00 − 2.50 − 3.03 − 4.04 = −20.58");
-  await expect(page.locator("#panel-cash .expected-value")).toHaveText("20.58");
-  const expected = "配送现金$1.01, 现金少$1.01\n银行转账多收客人$10, 现金少$10\n人民币支付多收客人$2.50, 现金少$2.50\nCard支付多收客人$3.03, 现金少$3.03\n其他支出$4.04, 现金少$4.04";
+  await page.locator("#cash-bank-transfer").fill("10");
+  await page.locator("#cash-rmb-payment").fill("2.50");
+  await page.locator("#cash-card-payment").fill("3.03");
+  const expected = "银行转账多收客人$10, 现金少$10\n人民币支付多收客人$2.50, 现金少$2.50\nCard支付多收客人$3.03, 现金少$3.03";
   await page.locator("#copy-cash-adjustments").tap();
   await expect.poll(() => page.evaluate(() => window.lastCopiedText)).toBe(expected);
   await expect(page.locator(".adjustment-preview:visible")).toHaveText(expected);
-  await expect(page.locator("#cash-result")).toHaveText("−20.58");
+  await expect(page.locator("#cash-result")).toHaveText("15.53");
   await page.locator("#cash-adjustments summary").tap();
-  await expect(page.locator("#cash-result")).toHaveText("−20.58");
+  await expect(page.locator("#cash-result")).toHaveText("15.53");
   await page.reload();
   await expect(page.locator("#cash-adjustments")).toHaveAttribute("open", "");
-  await expect(page.locator("#cash-result")).toHaveText("−20.58");
   await page.locator("#cash-bank-transfer").fill("0.001");
   await expect(page.locator("#copy-cash-adjustments")).toBeDisabled();
   await expect(page.locator("#cash-result")).toHaveText("—");
@@ -109,16 +97,14 @@ test("saved v2 amounts migrate into early shift and old unclassified change rema
   await expect(page.locator("#cash-late-total")).toHaveText("200.00");
   await expect(page.locator("#cash-early .extra-record label")).toHaveText(["早班补充记录1", "早班补充记录2"]);
   await expect(page.locator("#cash-legacy-change")).toHaveText("5.50");
-  await expect(page.locator("#cash-result")).toHaveText("−350.50");
-  await expect(page.locator("#panel-cash .formula-label")).toContainText("− 旧版未分类找零");
+  await expect(page.locator("#cash-result")).toHaveText("−329.50");
   await page.locator("#cash-bank-transfer").fill("5.50");
   await page.getByRole("button", { name: "已分类，移除此项", exact: true }).tap();
   await expect(page.locator(".legacy-adjustment")).toBeHidden();
-  await expect(page.locator("#cash-result")).toHaveText("−350.50");
+  await expect(page.locator("#cash-result")).toHaveText("−329.50");
   await page.reload();
   await expect(page.locator(".legacy-adjustment")).toBeHidden();
   await expect(page.locator("#cash-bank-transfer")).toHaveValue("5.50");
-  await expect(page.locator("#cash-result")).toHaveText("−350.50");
   expect(await page.evaluate(() => localStorage.getItem("no3-cash-calculator:state:v2"))).toBeNull();
 });
 

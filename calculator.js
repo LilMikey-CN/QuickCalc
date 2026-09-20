@@ -58,8 +58,7 @@ export function calculateCashBalance(drawer, systemCents, retained, adjustments)
     throw new RangeError("Cash balances must be non-negative integer cents.");
   }
   validateAmounts([retained, ...adjustments]);
-  // Difference = drawer − system cash − retained cash − every adjustment.
-  const expectedCents = systemCents + BigInt(retained) + adjustments.reduce((sum, amount) => sum + BigInt(amount), 0n);
+  const expectedCents = systemCents + BigInt(retained) - adjustments.reduce((sum, amount) => sum + BigInt(amount), 0n);
   // The synced note total can exceed both the manual input limit and safe Number range.
   return { expectedCents, differenceCents: BigInt(drawer) - expectedCents };
 }
