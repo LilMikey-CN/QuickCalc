@@ -1,6 +1,7 @@
 import { createAmountState, parseAmountState, parseLegacyAmountState } from "./amount-state.js";
 
-export const CARD_STORAGE_KEY = "no3-card-calculator:state:v2";
+export const CARD_STORAGE_KEY = "no3-card-calculator:state:v3";
+export const CARD_PREVIOUS_STORAGE_KEY = "no3-card-calculator:state:v2";
 const names = ["morning", "current", "overcharged", "undercharged"];
 export const createCardState = () => createAmountState(names);
 export const parseCardState = (text) => parseAmountState(text, names);

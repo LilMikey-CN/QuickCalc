@@ -5,7 +5,7 @@ import { calculateCardTotal, formatCents } from "../calculator.js";
 
 test("new Card state has no additional rows and customer adjustments start closed", () => {
   const state = createCardState();
-  assert.deepEqual(state.extras, []);
+  assert.deepEqual(state.extras, { early: [], late: [] });
   assert.equal(state.adjustmentsOpen, false);
   assert.equal(state.morning, "");
   assert.equal(state.current, "");
@@ -15,7 +15,7 @@ test("new Card state has no additional rows and customer adjustments start close
 test("saved records retain their order, stable numbers and unfinished decimal text", () => {
   const state = {
     ...createCardState(), morning: "0.1", current: "12.",
-    extras: [{ id: 1, value: ".5" }, { id: 3, value: "0.001" }], nextExtraNumber: 4,
+    extras: { early: [{ id: 1, value: ".5" }], late: [{ id: 3, value: "0.001" }] }, nextExtraNumber: 4,
     overcharged: "5.00", undercharged: "2.00", adjustmentsOpen: true,
   };
   assert.deepEqual(parseCardState(JSON.stringify(state)), state);
@@ -27,7 +27,7 @@ test("legacy Card amounts migrate without losing either customer adjustment", ()
   })), { ...createCardState(), morning: "100.25", current: "200.50", overcharged: "10.10", undercharged: "5.05" });
 });
 
-test("empty v2 state remains a valid saved reset", () => {
+test("empty v3 state remains a valid saved reset", () => {
   assert.deepEqual(parseCardState(JSON.stringify(createCardState())), createCardState());
 });
 
@@ -41,8 +41,16 @@ test("damaged state, duplicate IDs and unsafe record numbers are rejected", () =
     [{ id: 2, value: 100 }],
     [{ id: Number.MAX_SAFE_INTEGER + 1, value: "1" }],
     [{ id: 3, value: "1" }],
-  ]) assert.equal(parseCardState(JSON.stringify({ ...createCardState(), extras, nextExtraNumber: 3 })), null);
+  ]) assert.equal(parseCardState(JSON.stringify({ ...createCardState(), extras: { early: extras, late: [] }, nextExtraNumber: 3 })), null);
   assert.equal(parseLegacyCardState('{"morning":"100"}'), null);
+});
+
+test("v2 Card supplementary records migrate to early shift without changing raw amounts", () => {
+  const old = { ...createCardState(), version: 2, morning: "12.", current: "20.20", extras: [{ id: 3, value: "1.25" }], nextExtraNumber: 4 };
+  const migrated = parseCardState(JSON.stringify(old));
+  assert.equal(migrated.version, 3);
+  assert.equal(migrated.morning, "12.");
+  assert.deepEqual(migrated.extras, { early: old.extras, late: [] });
 });
 
 test("multiple Card records and adjustments calculate exactly without limiting the total", () => {

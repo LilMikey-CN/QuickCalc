@@ -10,8 +10,9 @@ test("tapping the same focused field recenters it after manual scrolling", async
   await expect.poll(async () => (await row.boundingBox()).y).toBeGreaterThan(160);
   await expect.poll(async () => (await row.boundingBox()).y).toBeLessThan(220);
   await page.evaluate(() => {
-    window.dispatchEvent(new Event("touchmove"));
-    (document.querySelector("#app-scroll") || document.scrollingElement).scrollTop += 90;
+    const scroller = document.querySelector("#app-scroll");
+    scroller.dispatchEvent(new Event("touchmove"));
+    scroller.scrollTop += 90;
   });
   await input.tap();
   await expect(input).toBeFocused();
@@ -57,20 +58,21 @@ test("keyboard resizing and Safari viewport panning keep the active field visibl
   await expect.poll(async () => (await row.boundingBox()).y).toBeLessThan(230);
 });
 
-test("new records, undo and tab changes position focus in the scroll area", async ({ page }) => {
+test("new records, deletion and tab changes position focus in the scroll area", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 420 });
   await page.goto("/");
-  await page.locator("#add-card-record").tap();
+  await page.locator("#add-card-early-record").tap();
   const extra = page.locator("#card-extra-1");
   await expect(extra).toBeFocused();
   await extra.fill("25.05");
-  await page.getByRole("button", { name: "删除补充记录1", exact: true }).tap();
-  await page.locator("#undo-card-record").tap();
-  await expect(extra).toBeFocused();
-  await expect(extra).toHaveValue("25.05");
-  await expect.poll(async () => (await page.locator("#card-extra-1-field").boundingBox()).y).toBeLessThan(220);
+  await page.getByRole("button", { name: "删除早班补充记录1", exact: true }).tap();
+  await expect(extra).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "撤销", exact: true })).toHaveCount(0);
+  await page.locator("#add-card-late-record").tap();
+  await expect(page.locator("#card-extra-2")).toBeFocused();
+  await expect.poll(async () => (await page.locator("#card-extra-2-field").boundingBox()).y).toBeLessThan(220);
   await page.getByRole("tab", { name: "点钞", exact: true }).tap();
-  await expect(extra).not.toBeFocused();
+  await expect(page.locator("#card-extra-2")).not.toBeFocused();
   await expect(page.locator(".calculator")).not.toHaveClass(/is-editing/);
   await page.locator("#notes-5").tap();
   await expect.poll(async () => (await page.locator("#notes-5-field").boundingBox()).y).toBeGreaterThan(160);
@@ -90,7 +92,7 @@ async function prepareCash(page) {
   await page.getByRole("tab", { name: "现金", exact: true }).tap();
   await page.locator("#cash-morning").fill("1000.10");
   await page.locator("#cash-current").fill("200.20");
-  await page.locator("#add-cash-record").tap();
+  await page.locator("#add-cash-early-record").tap();
   await page.locator("#cash-extra-1").fill("25.03");
 }
 

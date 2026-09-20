@@ -49,7 +49,16 @@ export function calculateCashTotal(drawer, morning, current, retained, delivery,
     throw new RangeError("Drawer balance must be non-negative integer cents.");
   }
   const systemCents = [morning, current, ...extras].reduce((sum, amount) => sum + BigInt(amount), 0n);
-  const expectedCents = systemCents + BigInt(retained) - BigInt(delivery) - BigInt(extraChange) - BigInt(expenses);
+  return calculateCashBalance(drawer, systemCents, retained, [delivery, extraChange, expenses]);
+}
+
+export function calculateCashBalance(drawer, systemCents, retained, adjustments) {
+  if (typeof systemCents !== "bigint" || systemCents < 0n
+    || (typeof drawer !== "bigint" && !Number.isSafeInteger(drawer)) || drawer < 0) {
+    throw new RangeError("Cash balances must be non-negative integer cents.");
+  }
+  validateAmounts([retained, ...adjustments]);
+  const expectedCents = systemCents + BigInt(retained) - adjustments.reduce((sum, amount) => sum + BigInt(amount), 0n);
   // The synced note total can exceed both the manual input limit and safe Number range.
   return { expectedCents, differenceCents: BigInt(drawer) - expectedCents };
 }

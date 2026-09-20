@@ -1,18 +1,25 @@
-import { calculateCardTotal, calculateCashTotal, formatCents, parseAmount } from "./calculator.js";
-import { CARD_STORAGE_KEY, createCardState, parseCardState, parseLegacyCardState } from "./card-state.js";
-import { CASH_STORAGE_KEY, createCashState, parseCashState, parseLegacyCashState } from "./cash-state.js";
-import { copyAmount, createAmountCopyButton } from "./clipboard.js";
+import { calculateCardTotal, calculateCashBalance, formatCents, parseAmount } from "./calculator.js";
+import { CARD_STORAGE_KEY, CARD_PREVIOUS_STORAGE_KEY, createCardState, parseCardState, parseLegacyCardState } from "./card-state.js";
+import { CASH_STORAGE_KEY, CASH_PREVIOUS_STORAGE_KEY, createCashState, parseCashState, parseLegacyCashState } from "./cash-state.js";
+import { copyAmount, createAmountCopyButton, createTextCopyButton } from "./clipboard.js";
+import { buildCashAdjustmentText } from "./cash-adjustments.js";
 
 export function createAmountCalculator(name, panel, config, { resetButton, isActive, getDrawerCents }) {
   const isCash = name === "cash";
   const storageKey = isCash ? CASH_STORAGE_KEY : CARD_STORAGE_KEY;
+  const previousKey = isCash ? CASH_PREVIOUS_STORAGE_KEY : CARD_PREVIOUS_STORAGE_KEY;
   const createState = isCash ? createCashState : createCardState;
   const parseState = isCash ? parseCashState : parseCardState;
   const parseLegacyState = isCash ? parseLegacyCashState : parseLegacyCardState;
-  const extraAfter = isCash ? "cash-morning" : "morning";
   const optionalFields = config.fields.slice(isCash ? 4 : 2);
-  const optionalIds = new Set(optionalFields.map((field) => field.id));
   const adjustmentLabel = isCash ? "现金支出调整" : "客人金额调整";
+  let state = createState();
+  let currentTotal = 0n;
+  let systemTotal = 0n;
+  let adjustmentText = "";
+  let copyFeedbackTimer;
+  const fieldCopyControls = new Map();
+
   panel.append(document.querySelector("#calculator-template").content.cloneNode(true));
   const get = (selector) => panel.querySelector(selector);
   const form = get("form");
@@ -30,13 +37,6 @@ export function createAmountCalculator(name, panel, config, { resetButton, isAct
   const actionStatus = get(".action-status");
   const storageStatus = get(".storage-status");
   const fieldList = get(".fields");
-  let state = createState();
-  let removedRecord = null;
-  let currentTotal = 0n;
-  let copyFeedbackTimer;
-  const fieldCopyControls = new Map();
-  let dailyCashCents = 0n;
-  let dailyCashCopy;
 
   function makeButton(text, className) {
     const button = document.createElement("button");
@@ -46,16 +46,48 @@ export function createAmountCalculator(name, panel, config, { resetButton, isAct
     return button;
   }
 
-  const addButton = makeButton("＋ 添加补充记录", "add-record-button");
-  addButton.id = `add-${name}-record`;
-  const feedback = document.createElement("div");
-  feedback.className = "record-feedback";
-  feedback.hidden = true;
-  const feedbackText = document.createElement("p");
-  feedbackText.setAttribute("role", "status");
-  const undoButton = makeButton("撤销", "undo-record-button");
-  undoButton.id = `undo-${name}-record`;
-  feedback.append(feedbackText, undoButton);
+  function makeSummary(id, labelText, hintText, readCents) {
+    const row = document.createElement("div");
+    row.id = `${id}-field`;
+    row.className = "derived-summary";
+    const caption = document.createElement("div");
+    const label = document.createElement("label");
+    label.htmlFor = id;
+    label.textContent = labelText;
+    const hint = document.createElement("p");
+    hint.textContent = hintText;
+    caption.append(label, hint);
+    const output = document.createElement("output");
+    output.id = id;
+    output.className = "derived-value";
+    output.setAttribute("aria-live", "polite");
+    output.setAttribute("aria-atomic", "true");
+    const control = createAmountCopyButton(id, labelText, readCents);
+    const valueGroup = document.createElement("div");
+    valueGroup.className = "copy-value-group";
+    valueGroup.append(output, control.button);
+    row.append(caption, valueGroup);
+    return { row, output, control };
+  }
+
+  const shifts = [
+    { key: "early", label: "早班", field: config.fields[isCash ? 1 : 0] },
+    { key: "late", label: "晚班", field: config.fields[isCash ? 2 : 1] },
+  ].map((shift) => {
+    shift.total = 0n;
+    shift.rows = document.createElement("section");
+    shift.rows.className = "fields shift-group";
+    shift.rows.id = `${name}-${shift.key}`;
+    shift.rows.setAttribute("aria-label", `${shift.label}记录`);
+    shift.add = makeButton(`＋ 添加${shift.label}补充记录`, "add-record-button");
+    shift.add.id = `add-${name}-${shift.key}-record`;
+    shift.add.addEventListener("click", () => addRecord(shift));
+    shift.summary = makeSummary(`${name}-${shift.key}-total`, `${shift.label}合计`,
+      isCash ? "系统现金 + 补充记录" : "记录 + 补充记录", () => shift.total);
+    return shift;
+  });
+  const daily = isCash ? makeSummary("cash-daily", "系统现金总和", "早班合计 + 晚班合计", () => systemTotal) : null;
+  daily?.row.classList.add("daily-summary");
 
   const adjustments = document.createElement("details");
   adjustments.className = "amount-adjustments";
@@ -68,60 +100,67 @@ export function createAmountCalculator(name, panel, config, { resetButton, isAct
   summary.append(summaryLabel, adjustmentStatus);
   const adjustmentFields = document.createElement("div");
   adjustmentFields.className = "fields adjustment-fields";
-  adjustments.append(summary, adjustmentFields);
+  adjustments.append(summary);
+  if (isCash) {
+    const hint = document.createElement("p");
+    hint.className = "adjustment-hint";
+    hint.textContent = "填写因非现金多收而找给客人的现金金额，所有金额以澳元填写。";
+    adjustments.append(hint);
+  }
+  adjustments.append(adjustmentFields);
   form.append(adjustments);
 
-  let dailyCashRow;
-  let dailyCashTotal;
-  if (isCash) {
-    dailyCashRow = document.createElement("div");
-    dailyCashRow.id = "cash-daily-field";
-    dailyCashRow.className = "cash-daily-summary";
-    const label = document.createElement("label");
-    label.htmlFor = "cash-daily";
-    label.textContent = "全天系统现金";
-    dailyCashTotal = document.createElement("output");
-    dailyCashTotal.id = "cash-daily";
-    dailyCashTotal.className = "derived-value";
-    dailyCashTotal.setAttribute("aria-live", "polite");
-    dailyCashTotal.setAttribute("aria-atomic", "true");
-    dailyCashCopy = createAmountCopyButton("cash-daily", "全天系统现金", () => dailyCashCents);
-    const valueGroup = document.createElement("div");
-    valueGroup.className = "copy-value-group";
-    valueGroup.append(dailyCashTotal, dailyCashCopy.button);
-    dailyCashRow.append(label, valueGroup);
+  const legacyPanel = document.createElement("div");
+  legacyPanel.className = "legacy-adjustment";
+  legacyPanel.hidden = true;
+  const legacyText = document.createElement("p");
+  const legacyValue = document.createElement("output");
+  legacyValue.id = "cash-legacy-change";
+  const clearLegacy = makeButton("已分类，移除此项", "resolve-legacy-button");
+  clearLegacy.addEventListener("click", () => {
+    state["cash-legacy-change"] = "";
+    update();
+    saveInputs();
+  });
+  legacyPanel.append(legacyText, legacyValue, clearLegacy);
+  const adjustmentPreview = document.createElement("pre");
+  adjustmentPreview.className = "adjustment-preview";
+  const copyAdjustments = isCash ? createTextCopyButton("cash-adjustments", "全部调整记录", () => adjustmentText) : null;
+  if (copyAdjustments) {
+    copyAdjustments.button.classList.add("copy-adjustments-button");
+    const label = document.createElement("span");
+    label.textContent = "复制全部调整记录";
+    copyAdjustments.button.append(label);
+    adjustments.append(legacyPanel, adjustmentPreview, copyAdjustments.button);
   }
 
-  function editableInputs() {
-    return [...form.querySelectorAll("input:not([readonly])")];
-  }
-
-  function visibleInputs() {
-    return editableInputs().filter((input) => !adjustments.contains(input) || adjustments.open);
-  }
+  function editableInputs() { return [...form.querySelectorAll("input:not([readonly])")]; }
+  function visibleInputs() { return editableInputs().filter((input) => !adjustments.contains(input) || adjustments.open); }
 
   function showStorageStatus(available) {
-    const text = available ? "本页输入自动保存在此浏览器" : "浏览器无法保存，关闭后输入可能丢失";
-    if (storageStatus.textContent !== text) storageStatus.textContent = text;
+    storageStatus.textContent = available ? "本页输入自动保存在此浏览器" : "浏览器无法保存，关闭后输入可能丢失";
     storageStatus.classList.toggle("storage-warning", !available);
   }
 
   function saveInputs() {
     try {
-      // An empty v2 state also prevents old saved amounts from returning after clear.
       localStorage.setItem(storageKey, JSON.stringify(state));
       showStorageStatus(true);
-    } catch {
-      showStorageStatus(false);
-      return;
-    }
-    // Delete the legacy copy only after the new state has been saved successfully.
-    try { localStorage.removeItem(config.storageKey); } catch { /* Migration can be retried later. */ }
+    } catch { showStorageStatus(false); return; }
+    // Remove previous copies only after the migrated state has been stored.
+    try { localStorage.removeItem(previousKey); localStorage.removeItem(config.storageKey); } catch { /* Retry later. */ }
   }
 
   function refreshReset() {
-    if (isActive()) resetButton.disabled = state.extras.length === 0
-      && !state.adjustmentsOpen && config.fields.filter((field) => !field.readOnly).every((field) => state[field.id] === "");
+    if (isActive()) resetButton.disabled = shifts.every((shift) => state.extras[shift.key].length === 0)
+      && !state.adjustmentsOpen && config.fields.filter((field) => !field.readOnly).every((field) => state[field.id] === "")
+      && (!isCash || state["cash-legacy-change"] === "");
+  }
+
+  function updateSummary(view, cents, ids) {
+    view.output.textContent = cents === null ? "—" : formatCents(cents, true);
+    view.output.setAttribute("for", ids.join(" "));
+    view.control.refresh();
   }
 
   function update() {
@@ -144,30 +183,46 @@ export function createAmountCalculator(name, panel, config, { resetButton, isAct
       return [input.id, amount];
     }));
 
-    const adjustmentAmounts = optionalFields.map((field) => parsed.get(field.id));
+    for (const shift of shifts) {
+      const ids = [shift.field.id, ...state.extras[shift.key].map((extra) => `${name}-extra-${extra.id}`)];
+      const values = ids.map((id) => parsed.get(id));
+      shift.total = values.every((value) => value.ok) ? calculateCardTotal(values.map((value) => value.cents)) : null;
+      updateSummary(shift.summary, shift.total, ids);
+    }
+    systemTotal = shifts.every((shift) => shift.total !== null) ? shifts[0].total + shifts[1].total : null;
+    if (daily) updateSummary(daily, systemTotal, shifts.map((shift) => shift.summary.output.id));
+    fieldCopyControls.forEach((control) => control.refresh());
+
+    const adjustmentTerms = [...optionalFields];
+    if (isCash) {
+      const legacy = parseAmount(state["cash-legacy-change"]);
+      const hasLegacy = !legacy.ok || legacy.cents !== 0;
+      legacyPanel.hidden = !hasLegacy;
+      legacyText.textContent = "旧版未分类找零仍计入现金差额。请先填入对应新分类，再移除此项，避免重复计算。";
+      legacyValue.textContent = legacy.ok ? formatCents(legacy.cents, true) : state["cash-legacy-change"];
+      if (hasLegacy) {
+        parsed.set("cash-legacy-change", legacy);
+        adjustmentTerms.push({ id: "cash-legacy-change", label: "旧版未分类找零", sign: "+" });
+      }
+      adjustmentText = buildCashAdjustmentText(state);
+      adjustmentPreview.textContent = adjustmentText ?? "请修改无效金额后复制";
+      adjustmentPreview.hidden = adjustmentText === "";
+      copyAdjustments.refresh();
+    }
+    const adjustmentAmounts = adjustmentTerms.map((term) => parsed.get(term.id));
     const invalidAdjustment = adjustmentAmounts.some((amount) => !amount.ok);
     const hasAdjustment = invalidAdjustment || adjustmentAmounts.some((amount) => amount.cents !== 0);
     adjustmentStatus.textContent = invalidAdjustment ? "请检查金额" : hasAdjustment ? "已计入合计" : "可选";
     adjustmentStatus.classList.toggle("invalid-adjustment", invalidAdjustment);
 
-    const terms = config.fields.flatMap((field) => {
-      if (optionalIds.has(field.id) && !adjustments.open && !hasAdjustment) return [];
-      return field.id === extraAfter ? [field, ...state.extras.map(extraFieldConfig)] : [field];
-    });
-    result.setAttribute("for", terms.map((term) => term.id).join(" "));
+    const terms = isCash ? [
+      { label: "钱箱余额", sign: "+", cents: parsed.get("cash-drawer").cents },
+      { label: "系统现金总和", sign: "−", cents: systemTotal },
+      { label: "昨日留存", sign: "−", cents: parsed.get("cash-retained").cents },
+    ] : shifts.map((shift) => ({ label: `${shift.label}合计`, sign: "+", cents: shift.total }));
+    if (adjustments.open || hasAdjustment) terms.push(...adjustmentTerms.map((term) => ({ ...term, cents: parsed.get(term.id).cents })));
+    result.setAttribute("for", inputs.map((input) => input.id).join(" "));
     get(".formula-label").textContent = terms.map((term, index) => `${index ? `${term.sign} ` : ""}${term.label}`).join(" ") + (isCash ? " = 现金差额" : "");
-
-    if (dailyCashTotal) {
-      const ids = ["cash-morning", ...state.extras.map((extra) => `${name}-extra-${extra.id}`), "cash-current"];
-      const systemAmounts = ids.map((id) => parsed.get(id));
-      dailyCashTotal.setAttribute("for", ids.join(" "));
-      dailyCashCents = systemAmounts.every((amount) => amount.ok)
-        ? calculateCardTotal(systemAmounts.map((amount) => amount.cents)) : null;
-      dailyCashTotal.textContent = dailyCashCents === null ? "—" : formatCents(dailyCashCents, true);
-      dailyCashCopy.refresh();
-    }
-    fieldCopyControls.forEach((control) => control.refresh());
-
     const invalid = [...parsed.values()].some((amount) => !amount.ok);
     copyButton.disabled = invalid;
     if (invalid) {
@@ -180,26 +235,23 @@ export function createAmountCalculator(name, panel, config, { resetButton, isAct
       get(".balance-status").textContent = "";
     } else {
       if (isCash) {
-        const extras = state.extras.map((extra) => parsed.get(`${name}-extra-${extra.id}`).cents);
-        const totals = calculateCashTotal(...config.fields.map((field) => parsed.get(field.id).cents), extras);
+        const drawer = parsed.get("cash-drawer").cents;
+        const totals = calculateCashBalance(drawer, systemTotal, parsed.get("cash-retained").cents, adjustmentAmounts.map((amount) => amount.cents));
         currentTotal = totals.differenceCents;
         get(".expected-value").textContent = formatCents(totals.expectedCents, true);
-        get(".drawer-value").textContent = formatCents(parsed.get("cash-drawer").cents, true);
+        get(".drawer-value").textContent = formatCents(drawer, true);
         get(".balance-status").textContent = currentTotal === 0n ? "账实相符" : currentTotal > 0n
           ? `钱箱多 ${formatCents(currentTotal, true)}` : `钱箱少 ${formatCents(-currentTotal, true)}`;
-      } else {
-        const additions = inputs.filter((input) => input.id !== "undercharged").map((input) => parsed.get(input.id).cents);
-        currentTotal = calculateCardTotal(additions, parsed.get("undercharged").cents);
-      }
+      } else currentTotal = systemTotal + BigInt(parsed.get("overcharged").cents) - BigInt(parsed.get("undercharged").cents);
       result.textContent = formatCents(currentTotal, true);
-      get(".formula-values").textContent = terms.map((term, index) => `${index ? `${term.sign} ` : ""}${formatCents(parsed.get(term.id).cents, true)}`).join(" ") + ` = ${formatCents(currentTotal, true)}`;
+      get(".formula-values").textContent = terms.map((term, index) => `${index ? `${term.sign} ` : ""}${formatCents(term.cents, true)}`).join(" ") + ` = ${formatCents(currentTotal, true)}`;
     }
     const visible = visibleInputs();
     visible.forEach((input, index) => { input.enterKeyHint = index === visible.length - 1 ? "done" : "next"; });
     refreshReset();
   }
 
-  function makeField(field, value, setValue, extra = null) {
+  function makeField(field, value, setValue, shift = null, extra = null) {
     const row = document.querySelector("#field-template").content.firstElementChild.cloneNode(true);
     row.id = `${field.id}-field`;
     row.classList.toggle("field-subtract", field.sign === "−");
@@ -213,25 +265,20 @@ export function createAmountCalculator(name, panel, config, { resetButton, isAct
     input.setAttribute("aria-describedby", `${name}-hint ${field.id}-error`);
     row.querySelector(".field-error").id = `${field.id}-error`;
     const marker = row.querySelector(".field-index");
-    if (isCash && (field.id === "cash-drawer" || field.id === "cash-morning")) {
+    if (isCash && (field.readOnly || shifts.some((item) => item.field.id === field.id))) {
       const control = createAmountCopyButton(field.id, field.label, () => {
         if (field.readOnly) return getDrawerCents();
         const amount = parseAmount(input.value);
         return amount.ok ? amount.cents : null;
       });
       fieldCopyControls.set(field.id, control);
-      const actions = document.createElement("div");
-      actions.className = "field-actions";
-      row.append(actions);
-      if (field.readOnly) actions.append(marker);
-      actions.append(control.button);
-    }
+      marker.replaceWith(control.button);
+    } else marker.remove();
     if (field.readOnly) {
       input.readOnly = true;
       input.tabIndex = -1;
       input.inputMode = "none";
       row.classList.add("field-synced");
-      marker.textContent = "点钞同步";
       const source = document.createElement("p");
       source.id = `${field.id}-source`;
       source.className = "linked-field-hint";
@@ -242,21 +289,17 @@ export function createAmountCalculator(name, panel, config, { resetButton, isAct
     }
     if (extra) {
       row.classList.add("extra-record");
-      const removeButton = makeButton("删除", "remove-record-button");
-      removeButton.setAttribute("aria-label", `删除${field.label}`);
-      marker.replaceWith(removeButton);
-      removeButton.addEventListener("click", () => removeRecord(extra.id));
-    } else marker.remove();
-
+      row.dataset.shift = shift.key;
+      const remove = makeButton("删除", "remove-record-button");
+      remove.setAttribute("aria-label", `删除${field.label}`);
+      remove.addEventListener("click", () => removeRecord(shift, extra.id));
+      row.append(remove);
+    }
     row.addEventListener("click", (event) => {
-      if (event.target !== input && !event.target.closest("button")) input.focus();
+      if (event.target !== input && !event.target.closest("button")) input.focus({ preventScroll: true });
     });
     input.addEventListener("focus", () => input.select());
-    input.addEventListener("input", () => {
-      setValue(input.value);
-      update();
-      saveInputs();
-    });
+    input.addEventListener("input", () => { setValue(input.value); update(); saveInputs(); });
     input.addEventListener("blur", () => {
       const amount = parseAmount(input.value);
       if (amount.ok && input.value.trim() !== "") input.value = formatCents(amount.cents);
@@ -270,105 +313,85 @@ export function createAmountCalculator(name, panel, config, { resetButton, isAct
       if (!parseAmount(input.value).ok) return;
       const visible = visibleInputs();
       const next = visible[visible.indexOf(input) + 1];
-      if (next) next.focus();
+      if (next) next.focus({ preventScroll: true });
       else input.blur();
     });
     return row;
   }
 
-  function extraFieldConfig(extra) {
-    return { id: `${name}-extra-${extra.id}`, label: `补充记录${extra.id}`, sign: isCash ? "−" : "+" };
-  }
-
-  function makeExtraField(extra) {
-    return makeField(extraFieldConfig(extra), extra.value, (value) => { extra.value = value; }, extra);
-  }
-
-  function discardUndo() {
-    removedRecord = null;
-    feedback.hidden = true;
-    feedbackText.textContent = "";
+  function makeExtraField(shift, extra, index) {
+    return makeField({ id: `${name}-extra-${extra.id}`, label: `${shift.label}补充记录${index + 1}`, sign: isCash ? "−" : "+" },
+      extra.value, (value) => { extra.value = value; }, shift, extra);
   }
 
   function renderFields() {
     fieldCopyControls.clear();
     fieldList.replaceChildren();
     adjustmentFields.replaceChildren();
-    for (const field of config.fields) {
-      const row = makeField(field, state[field.id], (value) => { state[field.id] = value; });
-      if (field.id === extraAfter) {
-        fieldList.append(row, ...state.extras.map(makeExtraField), addButton, feedback);
-      } else if (optionalIds.has(field.id)) adjustmentFields.append(row);
-      else fieldList.append(row);
-      if (field.id === "cash-current") fieldList.append(dailyCashRow);
+    if (isCash) fieldList.append(makeField(config.fields[0]));
+    for (const shift of shifts) {
+      shift.rows.replaceChildren(makeField(shift.field, state[shift.field.id], (value) => { state[shift.field.id] = value; }),
+        ...state.extras[shift.key].map((extra, index) => makeExtraField(shift, extra, index)), shift.add, shift.summary.row);
+      fieldList.append(shift.rows);
     }
+    if (isCash) fieldList.append(daily.row, makeField(config.fields[3], state["cash-retained"], (value) => { state["cash-retained"] = value; }));
+    for (const field of optionalFields) adjustmentFields.append(makeField(field, state[field.id], (value) => { state[field.id] = value; }));
     adjustments.open = state.adjustmentsOpen;
-    discardUndo();
   }
 
   function restoreInputs() {
     let saved;
-    let legacy;
+    let restored;
+    let migrated = false;
     try {
       saved = localStorage.getItem(storageKey);
-      if (saved === null) legacy = localStorage.getItem(config.storageKey);
+      if (saved !== null) restored = parseState(saved);
+      else {
+        const previous = localStorage.getItem(previousKey);
+        restored = previous !== null ? parseState(previous) : parseLegacyState(localStorage.getItem(config.storageKey));
+        migrated = Boolean(restored);
+      }
       showStorageStatus(true);
-    } catch {
-      showStorageStatus(false);
-      return;
-    }
-    const migrated = saved === null ? parseLegacyState(legacy) : null;
-    state = (saved === null ? migrated : parseState(saved)) || createState();
-    // Never silently hide existing nonzero or invalid adjustment amounts on restore.
-    state.adjustmentsOpen ||= optionalFields.some((field) => {
-      const amount = parseAmount(state[field.id]);
+    } catch { showStorageStatus(false); return; }
+    state = restored || createState();
+    state.adjustmentsOpen ||= [...optionalFields.map((field) => state[field.id]), ...(isCash ? [state["cash-legacy-change"]] : [])].some((value) => {
+      const amount = parseAmount(value);
       return !amount.ok || amount.cents !== 0;
     });
     renderFields();
     if (migrated) saveInputs();
   }
 
-  addButton.addEventListener("click", () => {
-    discardUndo();
+  function addRecord(shift) {
     const extra = { id: state.nextExtraNumber++, value: "" };
-    state.extras.push(extra);
-    const row = makeExtraField(extra);
-    addButton.before(row);
+    state.extras[shift.key].push(extra);
+    const row = makeExtraField(shift, extra, state.extras[shift.key].length - 1);
+    shift.add.before(row);
     update();
     saveInputs();
-    row.querySelector("input").focus();
-  });
-
-  function removeRecord(id) {
-    const index = state.extras.findIndex((extra) => extra.id === id);
-    if (index === -1) return;
-    const [extra] = state.extras.splice(index, 1);
-    removedRecord = { extra, index };
-    get(`#${name}-extra-${id}-field`).remove();
-    feedback.hidden = false;
-    feedbackText.textContent = `已删除补充记录${id}`;
-    update();
-    saveInputs();
-    const next = state.extras[index];
-    const nextButton = next ? get(`#${name}-extra-${next.id}-field .remove-record-button`) : addButton;
-    nextButton.focus();
+    row.querySelector("input").focus({ preventScroll: true });
   }
 
-  undoButton.addEventListener("click", () => {
-    if (!removedRecord) return;
-    const { extra, index } = removedRecord;
-    state.extras.splice(index, 0, extra);
-    const row = makeExtraField(extra);
-    const next = state.extras[index + 1];
-    (next ? get(`#${name}-extra-${next.id}-field`) : addButton).before(row);
-    discardUndo();
+  function removeRecord(shift, id) {
+    const records = state.extras[shift.key];
+    const index = records.findIndex((extra) => extra.id === id);
+    if (index === -1) return;
+    records.splice(index, 1);
+    get(`#${name}-extra-${id}-field`).remove();
+    records.forEach((extra, i) => {
+      const row = get(`#${name}-extra-${extra.id}-field`);
+      const label = `${shift.label}补充记录${i + 1}`;
+      row.querySelector("label").textContent = label;
+      row.querySelector("button").setAttribute("aria-label", `删除${label}`);
+    });
     update();
     saveInputs();
-    row.querySelector("input").focus();
-  });
+    actionStatus.textContent = `已删除${shift.label}补充记录${index + 1}`;
+    const next = records[index];
+    (next ? get(`#${name}-extra-${next.id}-field button`) : shift.add).focus({ preventScroll: true });
+  }
 
   adjustments.addEventListener("toggle", () => {
-    // Programmatic restoration also emits toggle; avoid redundant storage writes.
     if (state.adjustmentsOpen === adjustments.open) return;
     state.adjustmentsOpen = adjustments.open;
     update();
@@ -381,25 +404,18 @@ export function createAmountCalculator(name, panel, config, { resetButton, isAct
     renderFields();
     update();
     saveInputs();
-    get(`#${extraAfter}`).focus();
+    get(`#${shifts[0].field.id}`).focus({ preventScroll: true });
   });
-
   copyButton.addEventListener("click", async () => {
     if (currentTotal === null) return;
     try {
       const text = await copyAmount(currentTotal);
       copyLabel.textContent = "已复制";
       actionStatus.textContent = `已复制 ${text}`;
-      copyFeedbackTimer = setTimeout(() => {
-        copyLabel.textContent = "复制结果";
-        actionStatus.textContent = "";
-      }, 2500);
-    } catch {
-      actionStatus.textContent = "请长按上方结果进行复制";
-    }
+      copyFeedbackTimer = setTimeout(() => { copyLabel.textContent = "复制结果"; actionStatus.textContent = ""; }, 2500);
+    } catch { actionStatus.textContent = "请长按上方结果进行复制"; }
   });
 
-  // Render a usable blank calculator even when storage access is blocked.
   renderFields();
   restoreInputs();
   update();

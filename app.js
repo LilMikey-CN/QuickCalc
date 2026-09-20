@@ -2,32 +2,29 @@ import { calculateNoteTotals, formatCents, parseNoteCount } from "./calculator.j
 import { createAmountCalculator } from "./amount-calculator.js";
 import { installFocusScroll } from "./focus-scroll.js";
 import { copyAmount } from "./clipboard.js";
+import { cashAdjustmentFields } from "./cash-adjustments.js";
 
 const configurations = {
   card: {
     title: "Card 结算", subtitle: "输入金额，即时计算", resultTitle: "计算结果",
     storageKey: "no3-card-calculator:amounts:v1",
     fields: [
-      { id: "morning", label: "上午", sign: "+" },
-      { id: "current", label: "当前", sign: "+" },
+      { id: "morning", label: "早班", sign: "+" },
+      { id: "current", label: "晚班", sign: "+" },
       { id: "overcharged", label: "多收客人", sign: "+" },
       { id: "undercharged", label: "少收客人", sign: "−" },
     ],
-    formula: "上午 + 当前 + 多收客人 − 少收客人",
   },
   cash: {
     title: "现金核对", subtitle: "核对应有现金与钱箱余额", resultTitle: "现金差额",
     storageKey: "no3-cash-calculator:amounts:v1",
     fields: [
-      { id: "cash-drawer", label: "当前钱箱余额", sign: "+", readOnly: true },
-      { id: "cash-morning", label: "上午系统现金", sign: "−" },
-      { id: "cash-current", label: "当前系统现金", sign: "−" },
+      { id: "cash-drawer", label: "钱箱余额", sign: "+", readOnly: true },
+      { id: "cash-morning", label: "早班系统现金", sign: "−" },
+      { id: "cash-current", label: "晚班系统现金", sign: "−" },
       { id: "cash-retained", label: "昨日留存", sign: "−" },
-      { id: "cash-delivery", label: "配送现金", sign: "+" },
-      { id: "cash-extra-change", label: "多找客人现金", sign: "+" },
-      { id: "cash-expenses", label: "其他支出", sign: "+" },
+      ...cashAdjustmentFields,
     ],
-    formula: "当前钱箱余额 − 上午系统现金 − 当前系统现金 − 昨日留存 + 配送现金 + 多找客人现金 + 其他支出 = 现金差额",
   },
   notes: {
     title: "澳元点钞", subtitle: "输入张数，快速合计", resultTitle: "纸币总额 · AUD",
@@ -184,7 +181,7 @@ function createCalculator(name, config) {
 
   editableInputs.forEach((input, index) => {
     input.closest(".field").addEventListener("click", (event) => {
-      if (event.target !== input) input.focus();
+      if (event.target !== input) input.focus({ preventScroll: true });
     });
     input.addEventListener("input", () => {
       update();
@@ -202,7 +199,7 @@ function createCalculator(name, config) {
       if (event.key !== "Enter") return;
       event.preventDefault();
       if (!parse(input.value).ok) return;
-      if (index < editableInputs.length - 1) editableInputs[index + 1].focus();
+      if (index < editableInputs.length - 1) editableInputs[index + 1].focus({ preventScroll: true });
       else input.blur();
     });
   });
@@ -213,7 +210,7 @@ function createCalculator(name, config) {
     editableInputs.forEach((input) => { input.value = ""; });
     update();
     saveInputs();
-    editableInputs[0].focus();
+    editableInputs[0].focus({ preventScroll: true });
   });
 
   copyButton.addEventListener("click", async () => {

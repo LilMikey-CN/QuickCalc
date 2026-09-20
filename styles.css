@@ -65,7 +65,13 @@ h1 { font-size: 34px; font-weight: 650; letter-spacing: -1.2px; line-height: 1.2
 .field-synced { background: #eef2e5; border-color: #d9e1cb; cursor: default; }
 .field-synced input, .field-synced label { cursor: default; }
 .linked-field-hint { color: var(--muted); font-size: 12px; line-height: 1.5; margin-top: 3px; }
-.cash-daily-summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: -3px; padding: 0 8px 4px 16px; color: var(--muted); }
+.shift-group { gap: 10px; padding-bottom: 8px; }
+.derived-summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px 8px 14px; border-radius: 12px; color: #456043; background: #eef2e5; }
+.derived-summary > div:first-child { min-width: 0; }
+.derived-summary label { font-size: 14px; font-weight: 600; }
+.derived-summary p { margin-top: 3px; color: var(--muted); font-size: 10px; line-height: 1.5; }
+.daily-summary { margin-bottom: 4px; border: 1px solid #d4dfc5; background: #e5eddb; }
+.daily-summary .derived-value { font-size: 22px; }
 .copy-value-group { display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; }
 .field-actions { display: flex; flex-direction: column; align-items: center; gap: 4px; flex-shrink: 0; }
 .field-actions .field-index { align-self: center; }
@@ -75,12 +81,9 @@ h1 { font-size: 34px; font-weight: 650; letter-spacing: -1.2px; line-height: 1.2
 .copy-amount-button.is-copied .copied-glyph { display: block; }
 .copy-toast { position: absolute; bottom: max(16px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); z-index: 5; width: max-content; max-width: calc(100% - 32px); padding: 12px 16px; border-radius: 12px; color: #fff; background: #263e36; box-shadow: 0 4px 20px #263e3626; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; pointer-events: none; visibility: hidden; }
 .copy-toast.is-visible { visibility: visible; }
-.cash-daily-summary label { flex-shrink: 0; font-size: 13px; }
 .derived-value { min-width: 0; font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.4; text-align: right; overflow-wrap: anywhere; }
 .add-record-button { min-height: 48px; width: 100%; border: 1px dashed #9aaa8e; border-radius: 12px; background: #f0f3e9; color: #416347; font-size: 14px; font-weight: 550; }
 .remove-record-button { flex-shrink: 0; min-width: 44px; min-height: 44px; padding: 0 5px; border: 0; border-radius: 8px; background: transparent; color: #9a493a; font-size: 13px; }
-.record-feedback { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 12px; border-radius: 10px; background: #e9eedf; color: #536849; font-size: 12px; }
-.undo-record-button { min-width: 44px; min-height: 44px; padding: 0 8px; border: 0; border-radius: 8px; background: transparent; color: #214e3f; font-size: 13px; font-weight: 600; }
 .amount-adjustments { margin-top: 12px; }
 .amount-adjustments summary { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 8px 4px; color: #596851; font-size: 13px; cursor: pointer; list-style: none; touch-action: manipulation; }
 .amount-adjustments summary::-webkit-details-marker { display: none; }
@@ -90,6 +93,12 @@ h1 { font-size: 34px; font-weight: 650; letter-spacing: -1.2px; line-height: 1.2
 .adjustment-status { margin-left: auto; color: var(--muted); font-size: 11px; }
 .adjustment-status.invalid-adjustment { color: #a23926; }
 .adjustment-fields { margin-top: 4px; }
+.adjustment-hint { margin: 0 4px 10px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.copy-adjustments-button { width: 100%; height: auto; min-height: 48px; gap: 8px; margin-top: 10px; font-size: 14px; }
+.adjustment-preview { margin: 12px 0 0; padding: 12px; border-radius: 10px; background: #eef2e5; color: #456043; font: inherit; font-size: 12px; line-height: 1.8; white-space: pre-wrap; overflow-wrap: anywhere; }
+.legacy-adjustment { margin-top: 12px; padding: 12px; border: 1px solid #dcc79d; border-radius: 12px; color: #79623d; font-size: 12px; line-height: 1.6; }
+.legacy-adjustment output { display: block; margin: 6px 0; font-size: 22px; }
+.resolve-legacy-button { min-height: 44px; padding: 8px 12px; border: 1px solid #b8a582; border-radius: 8px; background: #fff; color: #79623d; }
 
 .result-card { margin-top: 18px; padding: 19px 21px 17px; border-radius: 20px; color: #fff; background: #214e3f; box-shadow: 0 7px 18px #214e3f0b; }
 .result-heading { display: flex; align-items: center; justify-content: space-between; }
