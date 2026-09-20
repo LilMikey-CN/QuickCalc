@@ -1,4 +1,6 @@
-import { calculateCashTotal, calculateNoteTotals, calculateTotal, formatCents, parseAmount, parseNoteCount } from "./calculator.js";
+import { calculateNoteTotals, formatCents, parseNoteCount } from "./calculator.js";
+import { createAmountCalculator } from "./amount-calculator.js";
+import { installFocusScroll } from "./focus-scroll.js";
 
 const configurations = {
   card: {
@@ -16,7 +18,7 @@ const configurations = {
     title: "现金核对", subtitle: "核对应有现金与钱箱余额", resultTitle: "现金差额",
     storageKey: "no3-cash-calculator:amounts:v1",
     fields: [
-      { id: "cash-drawer", label: "当前钱箱余额", sign: "+" },
+      { id: "cash-drawer", label: "当前钱箱余额", sign: "+", readOnly: true },
       { id: "cash-morning", label: "上午系统现金", sign: "−" },
       { id: "cash-current", label: "当前系统现金", sign: "−" },
       { id: "cash-retained", label: "昨日留存", sign: "−" },
@@ -38,55 +40,62 @@ const resetButton = document.querySelector("#reset-button");
 const tabButtons = [...document.querySelectorAll('[role="tab"]')];
 const ACTIVE_TAB_KEY = "no3-tools:active-tab:v1";
 let activeTab = "card";
+let noteTotalCents = 0n;
+const calculators = {};
+
+function syncCashDrawer(total) {
+  noteTotalCents = total;
+  calculators.cash?.update();
+}
 
 function createCalculator(name, config) {
   const panel = document.querySelector(`#panel-${name}`);
+  if (name !== "notes") {
+    return createAmountCalculator(name, panel, config, {
+      resetButton, isActive: () => activeTab === name, getDrawerCents: () => noteTotalCents,
+    });
+  }
   panel.append(document.querySelector("#calculator-template").content.cloneNode(true));
   const get = (selector) => panel.querySelector(selector);
   const form = get("form");
-  form.id = name === "card" ? "calculator-form" : `${name}-form`;
+  form.id = `${name}-form`;
   const hint = get(".input-hint");
   hint.id = `${name}-hint`;
-  const isNotes = name === "notes";
-  const parse = isNotes ? parseNoteCount : parseAmount;
-  if (isNotes) {
-    get(".input-heading").textContent = "输入纸币张数";
-    hint.textContent = "0、1、2… · 仅限整数";
-    get(".precision-hint").textContent = "澳元 AUD";
-  }
+  const parse = parseNoteCount;
+  get(".input-heading").textContent = "输入纸币张数";
+  hint.textContent = "0、1、2… · 仅限整数";
+  get(".precision-hint").textContent = "澳元 AUD";
 
   const inputs = config.fields.map((field, index) => {
     const row = document.querySelector("#field-template").content.firstElementChild.cloneNode(true);
     row.id = `${field.id}-field`;
-    row.classList.toggle("field-subtract", field.sign === "−");
-    row.classList.toggle("note-field", isNotes);
+    row.classList.add("note-field");
     const label = row.querySelector("label");
     label.htmlFor = field.id;
     label.textContent = field.label;
     const input = row.querySelector("input");
     input.id = field.id;
     input.name = field.id;
-    input.inputMode = isNotes ? "numeric" : "decimal";
-    input.placeholder = isNotes ? "0" : "0.00";
+    input.inputMode = "numeric";
+    input.placeholder = "0";
     input.enterKeyHint = index === config.fields.length - 1 ? "done" : "next";
     input.setAttribute("aria-describedby", `${hint.id} ${field.id}-error`);
     row.querySelector(".field-error").id = `${field.id}-error`;
-    row.querySelector(".operator").textContent = isNotes ? `$${field.denomination}` : field.sign;
-    row.querySelector(".field-index").textContent = isNotes ? "张" : String(index + 1).padStart(2, "0");
+    row.querySelector(".operator").textContent = `$${field.denomination}`;
+    row.querySelector(".field-index").textContent = "张";
     get(".fields").append(row);
     return input;
   });
+  const editableInputs = inputs;
 
   const result = get(".result-value");
-  result.id = name === "card" ? "result" : `${name}-result`;
+  result.id = `${name}-result`;
   result.setAttribute("for", inputs.map((input) => input.id).join(" "));
   get(".result-title").textContent = config.resultTitle;
   get(".result-title").id = `${name}-result-heading`;
   get(".result-card").setAttribute("aria-labelledby", `${name}-result-heading`);
   get(".formula-label").textContent = config.formula;
-  get(".cash-summary").hidden = name !== "cash";
-  get(".balance-status").hidden = name !== "cash";
-  get(".subtotal-card").hidden = !isNotes;
+  get(".subtotal-card").hidden = false;
   get(".subtotal-title").id = `${name}-subtotal-heading`;
   get(".subtotal-card").setAttribute("aria-labelledby", `${name}-subtotal-heading`);
   get(".subtotal-value").id = `${name}-subtotal`;
@@ -107,8 +116,8 @@ function createCalculator(name, config) {
   function saveInputs() {
     try {
       // Save text, including unfinished input, without decimal conversion.
-      if (inputs.every((input) => input.value === "")) localStorage.removeItem(config.storageKey);
-      else localStorage.setItem(config.storageKey, JSON.stringify(Object.fromEntries(inputs.map((input) => [input.id, input.value]))));
+      if (editableInputs.every((input) => input.value === "")) localStorage.removeItem(config.storageKey);
+      else localStorage.setItem(config.storageKey, JSON.stringify(Object.fromEntries(editableInputs.map((input) => [input.id, input.value]))));
       showStorageStatus(true);
     } catch {
       showStorageStatus(false);
@@ -127,12 +136,12 @@ function createCalculator(name, config) {
     let values;
     try { values = JSON.parse(savedText); } catch { /* Ignore damaged saved data. */ }
     const valid = values && typeof values === "object" && !Array.isArray(values)
-      && inputs.every((input) => typeof values[input.id] === "string");
-    inputs.forEach((input) => { input.value = valid ? values[input.id] : ""; });
+      && editableInputs.every((input) => typeof values[input.id] === "string");
+    editableInputs.forEach((input) => { input.value = valid ? values[input.id] : ""; });
   }
 
   function refreshReset() {
-    if (activeTab === name) resetButton.disabled = inputs.every((input) => input.value === "");
+    if (activeTab === name) resetButton.disabled = editableInputs.every((input) => input.value === "");
   }
 
   function update() {
@@ -155,38 +164,24 @@ function createCalculator(name, config) {
       currentTotal = null;
       result.textContent = "—";
       get(".formula-values").textContent = "请修改标红的输入后查看结果";
-      get(".expected-value").textContent = "—";
-      get(".drawer-value").textContent = "—";
-      get(".balance-status").textContent = "";
       get(".subtotal-value").textContent = "—";
       get(".subtotal-formula").textContent = "请修改标红的张数";
+      syncCashDrawer(null);
       return;
     }
 
-    if (isNotes) {
-      const counts = amounts.map((amount) => amount.count);
-      const totals = calculateNoteTotals(counts);
-      currentTotal = totals.totalCents;
-      const terms = counts.map((count, index) => `$${config.fields[index].denomination} × ${count}`);
-      get(".formula-values").textContent = terms.join(" + ");
-      get(".subtotal-value").textContent = formatCents(totals.smallNotesCents, true);
-      get(".subtotal-formula").textContent = terms.slice(2).join(" + ");
-    } else {
-      const cents = amounts.map((amount) => amount.cents);
-      if (name === "cash") {
-        const totals = calculateCashTotal(...cents);
-        currentTotal = totals.differenceCents;
-        get(".expected-value").textContent = formatCents(totals.expectedCents, true);
-        get(".drawer-value").textContent = formatCents(cents[0], true);
-        get(".balance-status").textContent = currentTotal === 0 ? "账实相符" : currentTotal > 0
-          ? `钱箱多 ${formatCents(currentTotal, true)}` : `钱箱少 ${formatCents(-currentTotal, true)}`;
-      } else currentTotal = calculateTotal(...cents);
-      get(".formula-values").textContent = cents.map((amount, index) => `${index ? `${config.fields[index].sign} ` : ""}${formatCents(amount, true)}`).join(" ") + ` = ${formatCents(currentTotal, true)}`;
-    }
+    const counts = amounts.map((amount) => amount.count);
+    const totals = calculateNoteTotals(counts);
+    currentTotal = totals.totalCents;
+    const terms = counts.map((count, index) => `$${config.fields[index].denomination} × ${count}`);
+    get(".formula-values").textContent = terms.join(" + ");
+    get(".subtotal-value").textContent = formatCents(totals.smallNotesCents, true);
+    get(".subtotal-formula").textContent = terms.slice(2).join(" + ");
     result.textContent = formatCents(currentTotal, true);
+    syncCashDrawer(currentTotal);
   }
 
-  inputs.forEach((input, index) => {
+  editableInputs.forEach((input, index) => {
     input.closest(".field").addEventListener("click", (event) => {
       if (event.target !== input) input.focus();
     });
@@ -198,7 +193,7 @@ function createCalculator(name, config) {
     input.addEventListener("focus", () => input.select());
     input.addEventListener("blur", () => {
       const amount = parse(input.value);
-      if (amount.ok && input.value.trim() !== "") input.value = isNotes ? String(amount.count) : formatCents(amount.cents);
+      if (amount.ok && input.value.trim() !== "") input.value = String(amount.count);
       update();
       saveInputs();
     });
@@ -206,7 +201,7 @@ function createCalculator(name, config) {
       if (event.key !== "Enter") return;
       event.preventDefault();
       if (!parse(input.value).ok) return;
-      if (index < inputs.length - 1) inputs[index + 1].focus();
+      if (index < editableInputs.length - 1) editableInputs[index + 1].focus();
       else input.blur();
     });
   });
@@ -214,10 +209,10 @@ function createCalculator(name, config) {
   form.addEventListener("submit", (event) => event.preventDefault());
   form.addEventListener("reset", (event) => {
     event.preventDefault();
-    inputs.forEach((input) => { input.value = ""; });
+    editableInputs.forEach((input) => { input.value = ""; });
     update();
     saveInputs();
-    inputs[0].focus();
+    editableInputs[0].focus();
   });
 
   copyButton.addEventListener("click", async () => {
@@ -241,10 +236,15 @@ function createCalculator(name, config) {
   return { panel, form, restoreInputs, update, refreshReset };
 }
 
-const calculators = Object.fromEntries(Object.entries(configurations).map(([name, config]) => [name, createCalculator(name, config)]));
+// Initialize in tab order so restored note counts populate the cash drawer.
+for (const button of tabButtons) {
+  const name = button.dataset.tab;
+  calculators[name] = createCalculator(name, configurations[name]);
+}
 
 function selectTab(name, remember = true) {
   if (!Object.hasOwn(calculators, name)) name = "card";
+  if (name !== activeTab) calculators[activeTab]?.panel.querySelector("input:focus")?.blur();
   activeTab = name;
   for (const button of tabButtons) {
     const selected = button.dataset.tab === name;
@@ -278,6 +278,7 @@ for (const [index, button] of tabButtons.entries()) {
 let savedTab = "card";
 try { savedTab = localStorage.getItem(ACTIVE_TAB_KEY) || "card"; } catch { /* Keep the default tab. */ }
 selectTab(savedTab, false);
+installFocusScroll(document.querySelector(".calculator"));
 window.addEventListener("pageshow", (event) => {
   for (const calculator of Object.values(calculators)) {
     if (event.persisted) calculator.restoreInputs();

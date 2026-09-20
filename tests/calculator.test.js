@@ -47,22 +47,32 @@ test("cash starts with the drawer, subtracts system and retained cash, and adds 
   const result = calculateCashTotal(...values);
   assert.equal(formatCents(result.expectedCents), "290.65");
   assert.equal(formatCents(result.differenceCents), "−40.65");
-  assert.equal(calculateCashTotal(240, 100, 200, 20, 10, 30, 40).differenceCents, 0);
-  assert.equal(calculateCashTotal(241, 100, 200, 20, 10, 30, 40).differenceCents, 1);
+  assert.equal(calculateCashTotal(240, 100, 200, 20, 10, 30, 40).differenceCents, 0n);
+  assert.equal(calculateCashTotal(241, 100, 200, 20, 10, 30, 40).differenceCents, 1n);
 });
 
-test("cash handles boundaries and validates all seven amounts", () => {
+test("cash validates manual amount limits and the non-negative integer drawer balance", () => {
   assert.deepEqual(calculateCashTotal(0, 2000000, 2000000, 2000000, 0, 0, 0), {
-    expectedCents: 6000000, differenceCents: -6000000,
+    expectedCents: 6000000n, differenceCents: -6000000n,
   });
   assert.deepEqual(calculateCashTotal(2000000, 0, 0, 0, 2000000, 2000000, 2000000), {
-    expectedCents: -6000000, differenceCents: 8000000,
+    expectedCents: -6000000n, differenceCents: 8000000n,
   });
-  for (let index = 0; index < 7; index += 1) {
+  for (let index = 1; index < 7; index += 1) {
     const values = Array(7).fill(0);
     values[index] = 2000001;
     assert.throws(() => calculateCashTotal(...values), RangeError);
   }
+  for (const drawer of [-1, -1n, 0.1, "100", NaN, Infinity, Number.MAX_SAFE_INTEGER + 1]) {
+    assert.throws(() => calculateCashTotal(drawer, 0, 0, 0, 0, 0, 0), RangeError);
+  }
+});
+
+test("synced note totals remain exact in cash calculations above manual and safe Number limits", () => {
+  const drawer = calculateNoteTotals([201n, 0n, 0n, 0n, 0n]).totalCents;
+  assert.equal(formatCents(calculateCashTotal(drawer, 10, 20, 0, 0, 0, 0).differenceCents), "20099.70");
+  const largeDrawer = calculateNoteTotals([9007199254740993n, 0n, 0n, 0n, 0n]).totalCents;
+  assert.equal(formatCents(calculateCashTotal(largeDrawer, 1, 0, 0, 0, 0, 0).differenceCents, true), "900,719,925,474,099,299.99");
 });
 
 test("note counts accept only non-negative whole-number text", () => {

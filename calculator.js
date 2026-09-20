@@ -29,16 +29,29 @@ export function calculateTotal(morning, current, overcharged, undercharged) {
   return morning + current + overcharged - undercharged;
 }
 
+/** Sum any number of additive Card records, then apply the shortage adjustment. */
+export function calculateCardTotal(additions, undercharged = 0) {
+  if (!Array.isArray(additions)) throw new TypeError("Expected an array of amounts.");
+  validateAmounts([...additions, undercharged]);
+  return additions.reduce((total, amount) => total + BigInt(amount), 0n) - BigInt(undercharged);
+}
+
 function validateAmounts(amounts) {
   if (amounts.some((amount) => !Number.isSafeInteger(amount) || amount < 0 || amount > MAX_CENTS)) {
     throw new RangeError("Amounts must be integer cents between 0 and 2,000,000.");
   }
 }
 
-export function calculateCashTotal(drawer, morning, current, retained, delivery, extraChange, expenses) {
-  validateAmounts([drawer, morning, current, retained, delivery, extraChange, expenses]);
-  const expectedCents = morning + current + retained - delivery - extraChange - expenses;
-  return { expectedCents, differenceCents: drawer - expectedCents };
+export function calculateCashTotal(drawer, morning, current, retained, delivery, extraChange, expenses, extras = []) {
+  if (!Array.isArray(extras)) throw new TypeError("Expected an array of supplementary amounts.");
+  validateAmounts([morning, current, retained, delivery, extraChange, expenses, ...extras]);
+  if ((typeof drawer !== "bigint" && !Number.isSafeInteger(drawer)) || drawer < 0) {
+    throw new RangeError("Drawer balance must be non-negative integer cents.");
+  }
+  const systemCents = [morning, current, ...extras].reduce((sum, amount) => sum + BigInt(amount), 0n);
+  const expectedCents = systemCents + BigInt(retained) - BigInt(delivery) - BigInt(extraChange) - BigInt(expenses);
+  // The synced note total can exceed both the manual input limit and safe Number range.
+  return { expectedCents, differenceCents: BigInt(drawer) - expectedCents };
 }
 
 /** Counts remain integers even beyond Number.MAX_SAFE_INTEGER. */
