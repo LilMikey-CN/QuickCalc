@@ -10,8 +10,8 @@ test("cash uses both shifts and both sets of supplementary records exactly once"
   assert.equal(formatCents(late), "200.50");
   assert.equal(formatCents(early + late), "300.80");
   const cash = calculateCashBalance(35000n, early + late, 1000, [300, 500, 250, 120, 10]);
-  assert.equal(formatCents(cash.differenceCents), "51.00");
-  assert.equal(formatCents(cash.expectedCents), "299.00");
+  assert.equal(formatCents(cash.differenceCents), "27.40");
+  assert.equal(formatCents(cash.expectedCents), "322.60");
 });
 
 test("adjustment copy includes only nonzero entries and uses actual newline characters", () => {

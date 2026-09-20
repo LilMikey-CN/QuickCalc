@@ -202,7 +202,7 @@ export function createAmountCalculator(name, panel, config, { resetButton, isAct
       legacyValue.textContent = legacy.ok ? formatCents(legacy.cents, true) : state["cash-legacy-change"];
       if (hasLegacy) {
         parsed.set("cash-legacy-change", legacy);
-        adjustmentTerms.push({ id: "cash-legacy-change", label: "旧版未分类找零", sign: "+" });
+        adjustmentTerms.push({ id: "cash-legacy-change", label: "旧版未分类找零", sign: "−" });
       }
       adjustmentText = buildCashAdjustmentText(state);
       adjustmentPreview.textContent = adjustmentText ?? "请修改无效金额后复制";

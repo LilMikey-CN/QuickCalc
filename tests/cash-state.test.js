@@ -41,8 +41,8 @@ test("v2 cash migration preserves old adjustments without guessing a payment met
 
 test("supplementary cash increases expected cash and reduces the difference exactly", () => {
   const result = calculateCashTotal(32500n, 10000, 15000, 3000, 1000, 500, 2000, [2500, 10, 20]);
-  assert.equal(formatCents(result.expectedCents), "270.30");
-  assert.equal(formatCents(result.differenceCents), "54.70");
+  assert.equal(formatCents(result.expectedCents), "340.30");
+  assert.equal(formatCents(result.differenceCents), "−15.30");
   assert.equal(calculateCashTotal(30n, 10, 0, 0, 0, 0, 0, [20]).differenceCents, 0n);
   assert.equal(formatCents(calculateCashTotal(0n, 0, 0, 0, 0, 0, 0, Array(100).fill(2000000)).differenceCents), "−2000000.00");
   for (const invalid of [-1, 0.1, 2000001]) {

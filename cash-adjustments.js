@@ -6,7 +6,7 @@ export const cashAdjustmentFields = [
   { id: "cash-rmb-payment", label: "人民币支付多找客人", description: "人民币支付多收客人" },
   { id: "cash-card-payment", label: "Card 支付多找客人", description: "Card支付多收客人" },
   { id: "cash-expenses", label: "其他支出", description: "其他支出" },
-].map((field) => ({ ...field, sign: "+" }));
+].map((field) => ({ ...field, sign: "−" }));
 
 export function buildCashAdjustmentText(values) {
   const fields = [...cashAdjustmentFields, { id: "cash-legacy-change", description: "旧版未分类找零" }];
