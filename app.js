@@ -1,6 +1,7 @@
 import { calculateNoteTotals, formatCents, parseNoteCount } from "./calculator.js";
 import { createAmountCalculator } from "./amount-calculator.js";
 import { installFocusScroll } from "./focus-scroll.js";
+import { copyAmount } from "./clipboard.js";
 
 const configurations = {
   card: {
@@ -217,9 +218,8 @@ function createCalculator(name, config) {
 
   copyButton.addEventListener("click", async () => {
     if (currentTotal === null) return;
-    const text = formatCents(currentTotal).replace("−", "-");
     try {
-      await navigator.clipboard.writeText(text);
+      const text = await copyAmount(currentTotal);
       copyLabel.textContent = "已复制";
       actionStatus.textContent = `已复制 ${text}`;
       copyFeedbackTimer = setTimeout(() => {
@@ -259,7 +259,7 @@ function selectTab(name, remember = true) {
   resetButton.setAttribute("aria-label", `清空本页：${configurations[name].title}`);
   calculators[name].refreshReset();
   if (remember) {
-    window.scrollTo(0, 0);
+    document.querySelector("#app-scroll").scrollTo(0, 0);
     try { localStorage.setItem(ACTIVE_TAB_KEY, name); } catch { /* Tabs work without storage. */ }
   }
 }

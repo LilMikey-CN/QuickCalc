@@ -1,6 +1,7 @@
 import { calculateCardTotal, calculateCashTotal, formatCents, parseAmount } from "./calculator.js";
 import { CARD_STORAGE_KEY, createCardState, parseCardState, parseLegacyCardState } from "./card-state.js";
 import { CASH_STORAGE_KEY, createCashState, parseCashState, parseLegacyCashState } from "./cash-state.js";
+import { copyAmount, createAmountCopyButton } from "./clipboard.js";
 
 export function createAmountCalculator(name, panel, config, { resetButton, isActive, getDrawerCents }) {
   const isCash = name === "cash";
@@ -33,6 +34,9 @@ export function createAmountCalculator(name, panel, config, { resetButton, isAct
   let removedRecord = null;
   let currentTotal = 0n;
   let copyFeedbackTimer;
+  const fieldCopyControls = new Map();
+  let dailyCashCents = 0n;
+  let dailyCashCopy;
 
   function makeButton(text, className) {
     const button = document.createElement("button");
@@ -81,7 +85,11 @@ export function createAmountCalculator(name, panel, config, { resetButton, isAct
     dailyCashTotal.className = "derived-value";
     dailyCashTotal.setAttribute("aria-live", "polite");
     dailyCashTotal.setAttribute("aria-atomic", "true");
-    dailyCashRow.append(label, dailyCashTotal);
+    dailyCashCopy = createAmountCopyButton("cash-daily", "全天系统现金", () => dailyCashCents);
+    const valueGroup = document.createElement("div");
+    valueGroup.className = "copy-value-group";
+    valueGroup.append(dailyCashTotal, dailyCashCopy.button);
+    dailyCashRow.append(label, valueGroup);
   }
 
   function editableInputs() {
@@ -153,9 +161,12 @@ export function createAmountCalculator(name, panel, config, { resetButton, isAct
       const ids = ["cash-morning", ...state.extras.map((extra) => `${name}-extra-${extra.id}`), "cash-current"];
       const systemAmounts = ids.map((id) => parsed.get(id));
       dailyCashTotal.setAttribute("for", ids.join(" "));
-      dailyCashTotal.textContent = systemAmounts.every((amount) => amount.ok)
-        ? formatCents(calculateCardTotal(systemAmounts.map((amount) => amount.cents)), true) : "—";
+      dailyCashCents = systemAmounts.every((amount) => amount.ok)
+        ? calculateCardTotal(systemAmounts.map((amount) => amount.cents)) : null;
+      dailyCashTotal.textContent = dailyCashCents === null ? "—" : formatCents(dailyCashCents, true);
+      dailyCashCopy.refresh();
     }
+    fieldCopyControls.forEach((control) => control.refresh());
 
     const invalid = [...parsed.values()].some((amount) => !amount.ok);
     copyButton.disabled = invalid;
@@ -202,6 +213,19 @@ export function createAmountCalculator(name, panel, config, { resetButton, isAct
     input.setAttribute("aria-describedby", `${name}-hint ${field.id}-error`);
     row.querySelector(".field-error").id = `${field.id}-error`;
     const marker = row.querySelector(".field-index");
+    if (isCash && (field.id === "cash-drawer" || field.id === "cash-morning")) {
+      const control = createAmountCopyButton(field.id, field.label, () => {
+        if (field.readOnly) return getDrawerCents();
+        const amount = parseAmount(input.value);
+        return amount.ok ? amount.cents : null;
+      });
+      fieldCopyControls.set(field.id, control);
+      const actions = document.createElement("div");
+      actions.className = "field-actions";
+      row.append(actions);
+      if (field.readOnly) actions.append(marker);
+      actions.append(control.button);
+    }
     if (field.readOnly) {
       input.readOnly = true;
       input.tabIndex = -1;
@@ -267,6 +291,7 @@ export function createAmountCalculator(name, panel, config, { resetButton, isAct
   }
 
   function renderFields() {
+    fieldCopyControls.clear();
     fieldList.replaceChildren();
     adjustmentFields.replaceChildren();
     for (const field of config.fields) {
@@ -361,9 +386,8 @@ export function createAmountCalculator(name, panel, config, { resetButton, isAct
 
   copyButton.addEventListener("click", async () => {
     if (currentTotal === null) return;
-    const text = formatCents(currentTotal).replace("−", "-");
     try {
-      await navigator.clipboard.writeText(text);
+      const text = await copyAmount(currentTotal);
       copyLabel.textContent = "已复制";
       actionStatus.textContent = `已复制 ${text}`;
       copyFeedbackTimer = setTimeout(() => {

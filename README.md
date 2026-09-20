@@ -12,7 +12,7 @@ A small mobile-first calculator with three tabs:
 - Decimal text is converted into integer cents before calculation, avoiding floating-point rounding artifacts. Results always show two decimal places and can be negative or greater than 20,000.
 - Large inputs, decimal keyboard hints, select-on-focus, clear-all, and copy-result controls make phone use quick.
 - Each tab's inputs save separately to this browser's `localStorage` after each edit and restore when the site reopens. The last selected tab is remembered. Results are recalculated from the restored inputs; values are never sent to a server.
-- No framework, external fonts, runtime dependencies, or third-party requests. The deployment build only copies the site's assets into `dist/`.
+- Vite bundles the site and its small scrolling and clipboard libraries into `dist/`. No external fonts or third-party requests are required at runtime.
 
 ## Supplementary records and adjustments
 
@@ -24,17 +24,24 @@ Rows, order, raw input text, and adjustments save automatically. Existing saved 
 
 ## Mobile focus scrolling
 
-Across all three tabs, focusing an editable field centers the whole field in the visible space above the mobile keyboard and below the tabs. The page responds to visual viewport resizing and panning during keyboard animation, with a window-height fallback for older browsers. Temporary bottom space lets the last input scroll into position. Manual scrolling takes priority, pinch zoom is respected, and the extra space is removed after leaving the inputs.
+Across all three tabs, [scroll-into-view-if-needed](https://github.com/scroll-into-view/scroll-into-view-if-needed) centers the focused field within a dedicated scroll area sized to the visible viewport. The browser keeps control of window panning while the keyboard opens; the app scrolls only its inner content. Keyboard resizing updates this area, including Safari's viewport offset, with a window-height fallback for older browsers. Tapping the same focused field recenters it after manual scrolling. Extra space lets the last field reach the center. Pinch zoom is respected.
+
+## Copying individual amounts
+
+The 现金 page has copy icons beside **当前钱箱余额** (the drawer total), **上午系统现金**, and **全天系统现金**. They copy the current value with two decimal places and no currency symbol or grouping commas, ready to paste into another field or app. 全天系统现金 includes supplementary records. Blank amounts copy as `0.00`; invalid amounts disable the affected copy button. A checkmark and a message confirm success.
+
+Copying uses [clipboard-copy](https://github.com/feross/clipboard-copy), which uses the Clipboard API on HTTPS/localhost and an older-browser fallback. Failed copying shows a manual-copy message. Touching an icon does not focus the amount input or open its keyboard.
 
 ## Local preview
 
 From this directory, run:
 
 ```sh
-python3 -m http.server 8080
+npm ci
+npm run dev
 ```
 
-Open `http://localhost:8080`. Use an HTTP server instead of opening `index.html` directly because the scripts use JavaScript modules. Copying uses the Clipboard API on HTTPS or localhost; if it is unavailable, the page suggests manually copying the displayed result.
+Open the local URL printed by Vite (normally `http://localhost:5173`). For a phone preview, use the network URL Vite prints. Deploy over HTTPS for full Clipboard API support. Source files require Vite because they import npm packages; do not open `index.html` directly.
 
 ## Remembering amounts
 
@@ -52,7 +59,15 @@ With Node.js 24:
 npm test
 ```
 
-No dependency installation is required. Tests cover decimal parsing, supplementary Card and cash records, saved-state migration, cash differences, note-count validation, denomination totals, small-note subtotals, exact arithmetic with very large counts, and focus positioning with keyboard viewport offsets.
+Run `npm ci` first. Unit tests cover exact arithmetic, supplementary records, saved-state migration, and note counting. Browser regression tests run in WebKit with iPhone settings and Chromium with mobile settings:
+
+```sh
+npx playwright install chromium webkit
+npm run build
+npm run test:browser
+```
+
+The browser tests cover repeated taps after scrolling, keyboard viewport resizing/panning, extra-row focus, clipboard values and fallback, validation, and narrow-screen controls. Chromium also tests copying and pasting through the real browser clipboard. Simulated keyboard geometry does not replace testing Safari with a physical iPhone keyboard.
 
 ## Vercel deployment
 
@@ -60,21 +75,21 @@ Import this repository as a Vercel project and keep the **Root Directory** at th
 
 | Setting | Value |
 | --- | --- |
-| Framework Preset | Other (no framework) |
+| Framework Preset | Vite |
 | Build Command | `npm run build` |
 | Output Directory | `dist` |
-| Install Command | Skipped (no dependencies) |
+| Install Command | `npm ci` |
 | Node.js Version | `24.x`, set in `package.json` |
 
-No environment variables or backend services are required. Vercel serves the site over HTTPS, which supports the copy-result button. Only the site assets in `dist/` are published; tests and project configuration stay outside the public output.
+No environment variables or backend services are required. Include `package-lock.json` so Vercel installs the tested dependencies. Vercel serves the site over HTTPS. Only bundled site assets in `dist/` are published; tests and project configuration stay outside the public output.
 
 To verify the production output locally:
 
 ```sh
 npm run build
-python3 -m http.server 8080 --directory dist
+npm run preview
 ```
 
-Open `http://localhost:8080`. Stop any existing server on that port first, or use another port.
+Open the preview URL Vite prints (normally `http://localhost:4173`).
 
 Generated `dist/`, local `.vercel/` configuration, and `node_modules/` are ignored by Git. Git operations, connecting the repository to Vercel, and deploying are left to you.

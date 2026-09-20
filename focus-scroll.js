@@ -1,89 +1,61 @@
-/** Center a field in the visible space between the tabs and the keyboard. */
-export function fieldScrollDelta(field, viewport, tabHeight) {
-  const top = viewport.offsetTop + tabHeight + 12;
-  const bottom = viewport.offsetTop + viewport.height - 20;
-  const targetTop = top + Math.max(0, (bottom - top - field.height) / 2);
-  return field.top - targetTop;
-}
+import scrollIntoView from "scroll-into-view-if-needed";
 
 export function installFocusScroll(root) {
+  const scroller = document.querySelector("#app-scroll");
   const viewport = window.visualViewport;
-  const tabs = root.querySelector(".tabs");
   let timer;
-  let followups = [];
-  let settlingUntil = 0;
-  let userScrolling = false;
+  let height;
 
-  const isMobile = () => matchMedia("(any-pointer: coarse), (max-width: 600px)").matches;
-  function focusedInput() {
+  function activeInput() {
     const input = document.activeElement;
     return input?.matches("input:not([readonly]):not([disabled])") && root.contains(input)
       && !input.closest("[hidden], details:not([open])") ? input : null;
   }
 
-  function cancel() {
-    clearTimeout(timer);
-    followups.forEach(clearTimeout);
-    followups = [];
-    settlingUntil = 0;
-  }
-
-  function align() {
-    const input = focusedInput();
-    if (!input || !isMobile() || userScrolling || (viewport && Math.abs(viewport.scale - 1) > 0.01)) return;
-    const visible = { offsetTop: viewport?.offsetTop ?? 0, height: viewport?.height ?? window.innerHeight };
-    // Let even the last field reach the target without clamping at the page bottom.
-    root.style.setProperty("--focus-scroll-space", `${Math.ceil(visible.height / 2)}px`);
-    const field = input.closest(".field") || input;
-    const delta = fieldScrollDelta(field.getBoundingClientRect(), visible, tabs?.getBoundingClientRect().height ?? 0);
-    if (Math.abs(delta) > 2) window.scrollBy({ top: delta, behavior: "auto" });
-  }
-
-  function schedule(delay = 80) {
-    clearTimeout(timer);
-    timer = setTimeout(align, delay);
-  }
-
-  root.addEventListener("focusin", () => {
-    cancel();
-    userScrolling = false;
-    if (!focusedInput() || !isMobile()) return;
-    settlingUntil = performance.now() + 900;
-    schedule(0);
-    // Safari pans its visual viewport as the keyboard animates. Recheck after
-    // focus as well as on viewport events, including browsers without that API.
-    followups = [350, 700].map((delay) => setTimeout(align, delay));
-  });
-
-  root.addEventListener("focusout", () => {
-    requestAnimationFrame(() => {
-      if (focusedInput()) return;
-      cancel();
-      root.style.removeProperty("--focus-scroll-space");
+  function positionInput() {
+    const input = activeInput();
+    if (!input || (viewport && Math.abs(viewport.scale - 1) > 0.01)) return;
+    // The library scrolls only our viewport-sized container. Safari owns window
+    // panning during keyboard animation; scrolling that window fights the OS.
+    scrollIntoView(input.closest(".field") || input, {
+      boundary: scroller, block: "center", inline: "nearest", behavior: "auto",
     });
-  });
-
-  function resized() {
-    if (!focusedInput() || userScrolling) return;
-    settlingUntil = performance.now() + 900;
-    schedule();
   }
-  viewport?.addEventListener("resize", resized);
-  window.addEventListener("resize", resized);
-  viewport?.addEventListener("scroll", () => {
-    if (performance.now() < settlingUntil && !userScrolling) schedule();
-  });
 
-  // After positioning, users can scroll freely without being pulled back.
-  window.addEventListener("pointerdown", cancel, { passive: true });
-  function manualScroll() {
-    userScrolling = true;
-    cancel();
+  function requestPosition() {
+    clearTimeout(timer);
+    const editing = Boolean(activeInput());
+    root.classList.toggle("is-editing", editing);
+    if (editing) timer = setTimeout(positionInput, 120);
   }
-  window.addEventListener("touchmove", manualScroll, { passive: true });
-  window.addEventListener("wheel", manualScroll, { passive: true });
-  window.addEventListener("pagehide", () => {
-    cancel();
-    root.style.removeProperty("--focus-scroll-space");
+
+  function syncViewport() {
+    // Leave pinch zoom and its panning to the browser.
+    if (viewport && Math.abs(viewport.scale - 1) > 0.01) return;
+    const nextHeight = viewport?.height ?? window.innerHeight;
+    document.documentElement.style.setProperty("--viewport-top", `${viewport?.offsetTop ?? 0}px`);
+    document.documentElement.style.setProperty("--viewport-height", `${nextHeight}px`);
+    if (height !== nextHeight) {
+      height = nextHeight;
+      requestPosition();
+    }
+  }
+
+  root.addEventListener("focusin", requestPosition);
+  root.addEventListener("focusout", () => requestAnimationFrame(requestPosition));
+  root.addEventListener("click", (event) => {
+    if (event.target.closest("button, summary")) return;
+    const input = event.target.closest(".field")?.querySelector("input");
+    // A second tap does not emit focusin, but must still reposition the field.
+    if (input && input === activeInput()) requestPosition();
   });
+  root.addEventListener("pointerdown", () => clearTimeout(timer), { passive: true });
+  scroller.addEventListener("touchmove", () => clearTimeout(timer), { passive: true });
+  scroller.addEventListener("wheel", () => clearTimeout(timer), { passive: true });
+  viewport?.addEventListener("resize", syncViewport);
+  viewport?.addEventListener("scroll", syncViewport);
+  window.addEventListener("resize", syncViewport);
+  window.addEventListener("pageshow", syncViewport);
+  window.addEventListener("pagehide", () => clearTimeout(timer));
+  syncViewport();
 }
