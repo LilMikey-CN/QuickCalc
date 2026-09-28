@@ -4,7 +4,7 @@ import { CASH_STORAGE_KEY, CASH_PREVIOUS_STORAGE_KEY, createCashState, parseCash
 import { copyAmount, createAmountCopyButton, createTextCopyButton } from "./clipboard.js";
 import { buildCashAdjustmentText } from "./cash-adjustments.js";
 
-export function createAmountCalculator(name, panel, config, { resetButton, isActive, getDrawerCents }) {
+export function createAmountCalculator(name, panel, config, { resetButton, isActive, getDrawerCents, onTotalChange }) {
   const isCash = name === "cash";
   const storageKey = isCash ? CASH_STORAGE_KEY : CARD_STORAGE_KEY;
   const previousKey = isCash ? CASH_PREVIOUS_STORAGE_KEY : CARD_PREVIOUS_STORAGE_KEY;
@@ -249,6 +249,7 @@ export function createAmountCalculator(name, panel, config, { resetButton, isAct
     const visible = visibleInputs();
     visible.forEach((input, index) => { input.enterKeyHint = index === visible.length - 1 ? "done" : "next"; });
     refreshReset();
+    onTotalChange?.();
   }
 
   function makeField(field, value, setValue, shift = null, extra = null) {
@@ -419,5 +420,5 @@ export function createAmountCalculator(name, panel, config, { resetButton, isAct
   renderFields();
   restoreInputs();
   update();
-  return { panel, form, restoreInputs, update, refreshReset };
+  return { panel, form, restoreInputs, update, refreshReset, getTotalCents: () => currentTotal };
 }

@@ -3,6 +3,7 @@ import { createAmountCalculator } from "./amount-calculator.js";
 import { installFocusScroll } from "./focus-scroll.js";
 import { copyAmount } from "./clipboard.js";
 import { cashAdjustmentFields } from "./cash-adjustments.js";
+import { createCoinCounter } from "./coin-counter.js";
 
 const configurations = {
   card: {
@@ -51,6 +52,7 @@ function createCalculator(name, config) {
   if (name !== "notes") {
     return createAmountCalculator(name, panel, config, {
       resetButton, isActive: () => activeTab === name, getDrawerCents: () => noteTotalCents,
+      onTotalChange: name === "card" ? () => calculators.notes?.refreshSummary() : undefined,
     });
   }
   panel.append(document.querySelector("#calculator-template").content.cloneNode(true));
@@ -102,10 +104,26 @@ function createCalculator(name, config) {
   const copyLabel = get(".copy-label");
   const actionStatus = get(".action-status");
   const storageStatus = get(".storage-status");
-  let currentTotal = 0;
+  let currentTotal = 0n;
+  let retainedCents = 0n;
   let copyFeedbackTimer;
+  let noteStorageAvailable = true;
+  let coinStorageAvailable = true;
+  const coinCounter = createCoinCounter(form, {
+    getSummaryAmounts: () => ({ cardCents: calculators.card?.getTotalCents() ?? null, noteCents: currentTotal, retainedCents }),
+    onChange: () => {
+      refreshReset();
+      inputs.at(-1).enterKeyHint = coinCounter.isOpen() ? "next" : "done";
+    },
+    onStorageStatus: (available) => {
+      coinStorageAvailable = available;
+      showStorageStatus(noteStorageAvailable);
+    },
+  });
 
   function showStorageStatus(available) {
+    noteStorageAvailable = available;
+    available &&= coinStorageAvailable;
     const message = available ? "本页输入自动保存在此浏览器" : "浏览器无法保存，关闭后输入可能丢失";
     if (storageStatus.textContent !== message) storageStatus.textContent = message;
     storageStatus.classList.toggle("storage-warning", !available);
@@ -123,6 +141,7 @@ function createCalculator(name, config) {
   }
 
   function restoreInputs() {
+    coinCounter.restore();
     let savedText;
     try {
       savedText = localStorage.getItem(config.storageKey);
@@ -139,7 +158,7 @@ function createCalculator(name, config) {
   }
 
   function refreshReset() {
-    if (activeTab === name) resetButton.disabled = editableInputs.every((input) => input.value === "");
+    if (activeTab === name) resetButton.disabled = editableInputs.every((input) => input.value === "") && !coinCounter.hasValues();
   }
 
   function update() {
@@ -160,23 +179,27 @@ function createCalculator(name, config) {
     copyButton.disabled = invalid;
     if (invalid) {
       currentTotal = null;
+      retainedCents = null;
       result.textContent = "—";
       get(".formula-values").textContent = "请修改标红的输入后查看结果";
       get(".subtotal-value").textContent = "—";
       get(".subtotal-formula").textContent = "请修改标红的张数";
       syncCashDrawer(null);
+      coinCounter.refreshSummary();
       return;
     }
 
     const counts = amounts.map((amount) => amount.count);
     const totals = calculateNoteTotals(counts);
     currentTotal = totals.totalCents;
+    retainedCents = totals.smallNotesCents;
     const terms = counts.map((count, index) => `$${config.fields[index].denomination} × ${count}`);
     get(".formula-values").textContent = terms.join(" + ");
     get(".subtotal-value").textContent = formatCents(totals.smallNotesCents, true);
     get(".subtotal-formula").textContent = terms.slice(2).join(" + ");
     result.textContent = formatCents(currentTotal, true);
     syncCashDrawer(currentTotal);
+    coinCounter.refreshSummary();
   }
 
   editableInputs.forEach((input, index) => {
@@ -200,6 +223,7 @@ function createCalculator(name, config) {
       event.preventDefault();
       if (!parse(input.value).ok) return;
       if (index < editableInputs.length - 1) editableInputs[index + 1].focus({ preventScroll: true });
+      else if (coinCounter.isOpen()) coinCounter.inputs[0].focus({ preventScroll: true });
       else input.blur();
     });
   });
@@ -208,6 +232,7 @@ function createCalculator(name, config) {
   form.addEventListener("reset", (event) => {
     event.preventDefault();
     editableInputs.forEach((input) => { input.value = ""; });
+    coinCounter.reset();
     update();
     saveInputs();
     editableInputs[0].focus({ preventScroll: true });
@@ -230,7 +255,7 @@ function createCalculator(name, config) {
 
   restoreInputs();
   update();
-  return { panel, form, restoreInputs, update, refreshReset };
+  return { panel, form, restoreInputs, update, refreshReset, refreshSummary: coinCounter.refreshSummary };
 }
 
 // Initialize in tab order so restored note counts populate the cash drawer.
@@ -255,6 +280,7 @@ function selectTab(name, remember = true) {
   resetButton.setAttribute("form", calculators[name].form.id);
   resetButton.setAttribute("aria-label", `清空本页：${configurations[name].title}`);
   calculators[name].refreshReset();
+  calculators[name].refreshSummary?.();
   if (remember) {
     document.querySelector("#app-scroll").scrollTo(0, 0);
     try { localStorage.setItem(ACTIVE_TAB_KEY, name); } catch { /* Tabs work without storage. */ }

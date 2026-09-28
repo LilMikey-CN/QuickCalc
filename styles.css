@@ -96,6 +96,13 @@ h1 { font-size: 34px; font-weight: 650; letter-spacing: -1.2px; line-height: 1.2
 .adjustment-hint { margin: 0 4px 10px; color: var(--muted); font-size: 12px; line-height: 1.6; }
 .copy-adjustments-button { width: 100%; height: auto; min-height: 48px; gap: 8px; margin-top: 10px; font-size: 14px; }
 .adjustment-preview { margin: 12px 0 0; padding: 12px; border-radius: 10px; background: #eef2e5; color: #456043; font: inherit; font-size: 12px; line-height: 1.8; white-space: pre-wrap; overflow-wrap: anywhere; }
+.coin-total-row { margin-top: 12px; min-height: 52px; }
+.coin-total-row label { font-size: 14px; font-weight: 600; }
+.cash-report { margin-top: 18px; padding: 14px; border: 1px solid #d9e1cb; border-radius: 16px; background: #eef2e5; }
+.cash-report .adjustment-hint { margin: 0 0 10px; }
+#cash-report-text { margin: 0; padding: 12px; border-radius: 10px; background: #fff; color: #263e36; font: inherit; font-size: 14px; line-height: 1.9; font-variant-numeric: tabular-nums; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; -webkit-user-select: text; }
+#cash-report-text.report-invalid { color: #a23926; }
+.cash-report .copy-adjustments-button { color: #fff; background: var(--green); }
 .legacy-adjustment { margin-top: 12px; padding: 12px; border: 1px solid #dcc79d; border-radius: 12px; color: #79623d; font-size: 12px; line-height: 1.6; }
 .legacy-adjustment output { display: block; margin: 6px 0; font-size: 22px; }
 .resolve-legacy-button { min-height: 44px; padding: 8px 12px; border: 1px solid #b8a582; border-radius: 8px; background: #fff; color: #79623d; }
