@@ -1,4 +1,6 @@
 export const MAX_CENTS = 2_000_000;
+export const NOTE_DENOMINATIONS = Object.freeze([100, 50, 20, 10, 5]);
+export const DEFAULT_RETAINED_DENOMINATIONS = Object.freeze([10, 5]);
 
 /** Convert decimal text directly into integer cents; never multiply a float by 100. */
 export function parseAmount(value) {
@@ -73,16 +75,20 @@ export function parseNoteCount(value) {
   return { ok: true, count: BigInt(text) };
 }
 
-export function calculateNoteTotals(counts) {
+export function calculateNoteTotals(counts, retainedDenominations = DEFAULT_RETAINED_DENOMINATIONS) {
   if (!Array.isArray(counts) || counts.length !== 5
     || counts.some((count) => typeof count !== "bigint" || count < 0n)) {
     throw new RangeError("Expected five non-negative integer note counts.");
   }
-  const denominations = [100n, 50n, 20n, 10n, 5n];
-  const values = counts.map((count, index) => count * denominations[index] * 100n);
+  if (!Array.isArray(retainedDenominations)
+    || retainedDenominations.some((value) => !NOTE_DENOMINATIONS.includes(value))
+    || new Set(retainedDenominations).size !== retainedDenominations.length) {
+    throw new RangeError("Expected a selection of distinct note denominations.");
+  }
+  const values = counts.map((count, index) => count * BigInt(NOTE_DENOMINATIONS[index]) * 100n);
   return {
     totalCents: values.reduce((total, value) => total + value, 0n),
-    smallNotesCents: values[2] + values[3] + values[4],
+    retainedCents: values.reduce((total, value, index) => retainedDenominations.includes(NOTE_DENOMINATIONS[index]) ? total + value : total, 0n),
   };
 }
 

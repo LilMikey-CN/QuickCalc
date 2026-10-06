@@ -17,7 +17,7 @@ export function installFocusScroll(root) {
 
   function activeInput() {
     const input = document.activeElement;
-    return input?.matches("input:not([readonly]):not([disabled])") && root.contains(input)
+    return input?.matches('input[type="text"]:not([readonly]):not([disabled])') && root.contains(input)
       && !input.closest("[hidden], details:not([open])") ? input : null;
   }
 

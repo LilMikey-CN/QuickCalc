@@ -84,15 +84,15 @@ test("note counts accept only non-negative whole-number text", () => {
   }
 });
 
-test("note totals include all denominations and the small-note subtotal excludes 100 and 50", () => {
+test("note totals include all denominations and default retention includes only 10 and 5", () => {
   assert.deepEqual(calculateNoteTotals([1n, 2n, 3n, 4n, 5n]), {
-    totalCents: 32500n, smallNotesCents: 12500n,
+    totalCents: 32500n, retainedCents: 6500n,
   });
   assert.deepEqual(calculateNoteTotals([1n, 1n, 0n, 0n, 0n]), {
-    totalCents: 15000n, smallNotesCents: 0n,
+    totalCents: 15000n, retainedCents: 0n,
   });
   assert.deepEqual(calculateNoteTotals([0n, 0n, 0n, 0n, 0n]), {
-    totalCents: 0n, smallNotesCents: 0n,
+    totalCents: 0n, retainedCents: 0n,
   });
   assert.throws(() => calculateNoteTotals([0n, 0n, -1n, 0n, 0n]), RangeError);
   assert.throws(() => calculateNoteTotals([0, 0, 0, 0, 0]), RangeError);

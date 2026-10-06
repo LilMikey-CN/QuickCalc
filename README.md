@@ -3,7 +3,7 @@
 A small mobile-first calculator with three tabs:
 
 - **Card:** Starts with 早班 and 晚班, each with its own **添加补充记录** button and copyable subtotal. The result is 早班合计 + 晚班合计 + 多收客人 − 少收客人. **客人金额调整** optionally reveals the two customer adjustments.
-- **点钞:** Enter the number of Australian $100, $50, $20, $10, and $5 notes. See the total value in AUD and a separate subtotal for the $20/$10/$5 notes using the same counts. Expand the optional **硬币统计** section below the note inputs to count $2, $1, $0.50, $0.20, $0.10, and $0.05 coins and copy a daily cash report. Note and coin counts must be non-negative whole numbers; decimals, negatives, and exponent notation are rejected. Integer arithmetic keeps even very large counts exact.
+- **点钞:** Enter the number of Australian $100, $50, $20, $10, and $5 notes. See the total value in AUD and choose which denominations count toward **留存金额**, with $10 and $5 selected by default. Expand the optional **硬币统计** section below the paper total and retention settings to count $2, $1, $0.50, $0.20, $0.10, and $0.05 coins and copy a daily cash report. Note and coin counts must be non-negative whole numbers; decimals, negatives, and exponent notation are rejected. Integer arithmetic keeps even very large counts exact.
 - **现金:** 钱箱余额 − 系统现金总和 − 昨日留存 + 现金支出调整 = 现金差额. Both 早班系统现金 and 晚班系统现金 support supplementary records and copyable subtotals. 系统现金总和 includes both shifts and all their supplementary records. **现金支出调整** optionally reveals 配送现金, 银行转账多找客人, 人民币支付多找客人, Card 支付多找客人, and 其他支出. Positive differences mean the drawer has extra cash; negative differences mean it is short.
 
 - **钱箱余额** is read-only and automatically follows **纸币总额** from 点钞. Change note counts to update it; the cash difference recalculates immediately. Invalid note counts withhold the linked balance and cash result until corrected.
@@ -32,18 +32,26 @@ Card支付多收客人$3.03, 现金少$3.03
 
 **清空** removes that tab's extra rows and editable amounts and closes its adjustment section. Card returns to the two-field starting layout. Cash retains the read-only drawer balance from 点钞. The empty saved state prevents legacy values from returning after a reset.
 
+## Note retention preferences
+
+The 点钞 page shows note counts, the full paper total, **留存金额** with denomination checkboxes, then the optional coin section. Checkboxes include all notes of a selected denomination in retention. $10 and $5 start selected; $20, $50, and $100 can also be selected, and every denomination can be deselected. An empty selection displays **未选择留存面额** and a zero retention amount. All notes always contribute to the paper total and the synced cash drawer.
+
+The selected denominations save immediately under `no3-note-counter:retention:v1`, independently of note and coin counts. Reloading restores the preference, including an intentionally empty selection. **清空** clears counts and preserves the selection. Existing users with no saved preference receive the new $10/$5 default; their saved counts remain intact. Invalid preference data falls back to the defaults. If saving is unavailable, an inline notice explains that the preference may be lost on reopening.
+
+Each checkbox has a large labeled touch target. Selecting denominations updates the retention total, calculation details, and the daily report immediately. Checkbox focus does not open a number keyboard or trigger the app's focus scrolling.
+
 ## Coins and daily cash report
 
 **硬币统计** starts collapsed. Expanding it reveals six coin count inputs, their total, and the **现金汇总** text with a **复制现金汇总** button. Collapsing it hides the report and preserves the counts. Coin counts and the expanded state save separately in `localStorage`, preserving existing note data. **清空** on 点钞 clears both notes and coins and closes the coin section.
 
-The report uses the device's local date automatically and refreshes at midnight or when returning to the page. **Card** is the Card tab's final total, including both shifts, supplementary records, and customer adjustments. **Cash** is the total of all paper notes; **留** is only the subtotal of $20/$10/$5 notes. **Coins** and the denomination counts remain separate from paper cash and retention. The cash drawer on 现金 continues to follow the paper note total.
+The report uses the device's local date automatically and refreshes at midnight or when returning to the page. **Card** is the Card tab's final total, including both shifts, supplementary records, and customer adjustments. **Cash** is the total of all paper notes; **留** is the subtotal of the selected note denominations. **Coins** and the denomination counts remain separate from paper cash and retention. The cash drawer on 现金 continues to follow the paper note total.
 
-For example, 20 × $100, 10 × $20, 2 × $10, and 1 × $5, with the coin counts below, produce:
+For example, 20 × $100, 10 × $20, 2 × $10, and 1 × $5, with the default $10/$5 retention and the coin counts below, produce:
 
 ```text
 日期：9.28
 Card：$5551.80
-Cash：$2225（留$225）
+Cash：$2225（留$25）
 Coins：$21.4
 $2x 7  $1x 0  $0.5x 1
 $0.2x 28  $0.1x 11  $0.05x 4
@@ -53,7 +61,7 @@ The copy preserves line breaks and includes zero-count denominations. Card alway
 
 ## Mobile focus scrolling
 
-Across all three tabs, [scroll-into-view-if-needed](https://github.com/scroll-into-view/scroll-into-view-if-needed) centers the focused field within a dedicated scroll area sized to the visible viewport. The browser keeps control of window panning while the keyboard opens; the app scrolls only its inner content. Keyboard resizing updates this area, including Safari's viewport offset, with a window-height fallback for older browsers. Tapping the same focused field recenters it after manual scrolling. Extra space lets the last field reach the center. Pinch zoom is respected.
+Across all three tabs, [scroll-into-view-if-needed](https://github.com/scroll-into-view/scroll-into-view-if-needed) centers the focused amount or count input within a dedicated scroll area sized to the visible viewport. Retention checkboxes are excluded. The browser keeps control of window panning while the keyboard opens; the app scrolls only its inner content. Keyboard resizing updates this area, including Safari's viewport offset, with a window-height fallback for older browsers. Tapping the same focused field recenters it after manual scrolling. Extra space lets the last field reach the center. Pinch zoom is respected.
 
 [Motion](https://motion.dev/) animates scrolling with a damped spring and preserves velocity when the destination changes. Touch gestures, pointer presses, and mouse-wheel scrolling interrupt the animation. The system's reduced-motion preference skips the animation and moves directly to the field.
 
@@ -100,7 +108,7 @@ npm run build
 npm run test:browser
 ```
 
-The browser tests cover separate shift records, consecutive numbering after deletion, copyable subtotals, multiline adjustment copying, saved-state migration, repeated taps after scrolling, spring animation and reduced motion, keyboard viewport resizing/panning, extra-row focus, clipboard values and fallback, validation, and narrow-screen controls. Coin tests also cover report data sources, exact coin totals, copying, local midnight rollover, saved counts, clearing, and storage failures. Chromium also tests copying and pasting through the real browser clipboard. Simulated keyboard geometry does not replace testing Safari with a physical iPhone keyboard.
+The browser tests cover separate shift records, consecutive numbering after deletion, copyable subtotals, multiline adjustment copying, saved-state migration, repeated taps after scrolling, spring animation and reduced motion, keyboard viewport resizing/panning, extra-row focus, clipboard values and fallback, validation, and narrow-screen controls. Coin tests also cover report data sources, exact coin totals, copying, local midnight rollover, saved counts, clearing, and storage failures. Retention tests cover all 32 denomination combinations, the default and empty selections, persistence across reload/clear, report updates, keyboard accessibility, and checkbox taps without automatic scrolling. Chromium also tests copying and pasting through the real browser clipboard. Simulated keyboard geometry does not replace testing Safari with a physical iPhone keyboard.
 
 ## Vercel deployment
 

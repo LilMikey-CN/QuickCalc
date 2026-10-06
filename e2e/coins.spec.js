@@ -12,7 +12,7 @@ async function setup(page) {
   await page.goto("/");
 }
 
-test("optional coins produce a copyable report using Card total and small note retention", async ({ page }) => {
+test("optional coins produce a copyable report using Card total and default note retention", async ({ page }) => {
   await page.addInitScript(() => {
     if (sessionStorage.getItem("card-seeded")) return;
     sessionStorage.setItem("card-seeded", "yes");
@@ -26,9 +26,12 @@ test("optional coins produce a copyable report using Card total and small note r
   await page.getByRole("tab", { name: "点钞", exact: true }).tap();
   await expect(page.locator("#cash-report-text")).toBeHidden();
   for (const [id, count] of [[100, "20"], [20, "10"], [10, "2"], [5, "1"]]) await page.locator(`#notes-${id}`).fill(count);
+  // Finish editing before scrolling past the totals to the optional section.
+  await page.locator("#notes-5").blur();
+  await expect(page.locator(".calculator")).not.toHaveClass(/is-editing/);
   await page.locator("#coin-counter summary").tap();
   for (const [id, count] of [[200, "7"], [100, "0"], [50, "1"], [20, "28"], [10, "11"], [5, "4"]]) await page.locator(`#coins-${id}`).fill(count);
-  const report = "日期：9.28\nCard：$5551.80\nCash：$2225（留$225）\nCoins：$21.4\n$2x 7  $1x 0  $0.5x 1\n$0.2x 28  $0.1x 11  $0.05x 4";
+  const report = "日期：9.28\nCard：$5551.80\nCash：$2225（留$25）\nCoins：$21.4\n$2x 7  $1x 0  $0.5x 1\n$0.2x 28  $0.1x 11  $0.05x 4";
   await expect(page.locator("#coins-total")).toHaveText("21.40");
   await expect(page.locator("#cash-report-text")).toHaveText(report);
   await page.locator("#copy-cash-report").tap();
@@ -108,7 +111,7 @@ test("saved paper counts survive the upgrade and coin storage failure remains vi
   await page.locator("#coins-200").fill("2");
   await page.locator("#notes-100").fill("2");
   await expect(page.locator("#panel-notes .storage-status")).toContainText("浏览器无法保存");
-  await expect(page.locator("#cash-report-text")).toContainText("Cash：$425（留$125）\nCoins：$4");
+  await expect(page.locator("#cash-report-text")).toContainText("Cash：$425（留$65）\nCoins：$4");
   await page.locator("#copy-cash-report").tap();
   await expect.poll(() => page.evaluate(() => window.lastCopiedText)).toContain("Coins：$4");
 });

@@ -18,7 +18,7 @@ export function createCoinCounter(form, { getSummaryAmounts, onChange, onStorage
     </div>
     <section class="cash-report" aria-labelledby="cash-report-heading">
       <div class="section-heading"><h2 id="cash-report-heading">现金汇总</h2><p>日期自动更新</p></div>
-      <p class="adjustment-hint">Card 为结算合计；Cash 为纸币总额；留存仅含 $20 / $10 / $5 纸币。</p>
+      <p class="adjustment-hint">Card 为结算合计；Cash 为纸币总额；留存按上方勾选的纸币面额计算。</p>
       <pre id="cash-report-text" tabindex="0" aria-label="现金汇总文本"></pre>
     </section>`;
   form.append(details);

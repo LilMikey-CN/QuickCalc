@@ -14,10 +14,10 @@ test("coin counts accept whole non-negative numbers and preserve large counts ex
   assert.throws(() => calculateCoinTotal([0n, 0n, 0n, 0n, 0n, -1n]), RangeError);
 });
 
-test("cash report keeps coins separate and retains only small denomination notes", () => {
-  const notes = calculateNoteTotals([20n, 0n, 10n, 2n, 1n]);
+test("cash report keeps coins separate and uses the selected note retention", () => {
+  const notes = calculateNoteTotals([20n, 0n, 10n, 2n, 1n], [20, 10, 5]);
   assert.equal(buildCashReport({
-    cardCents: 555180n, noteCents: notes.totalCents, retainedCents: notes.smallNotesCents,
+    cardCents: 555180n, noteCents: notes.totalCents, retainedCents: notes.retainedCents,
     coinCounts: [7n, 0n, 1n, 28n, 11n, 4n], date: new Date(2026, 8, 28),
   }), "日期：9.28\nCard：$5551.80\nCash：$2225（留$225）\nCoins：$21.4\n$2x 7  $1x 0  $0.5x 1\n$0.2x 28  $0.1x 11  $0.05x 4");
 });

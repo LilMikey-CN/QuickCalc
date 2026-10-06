@@ -125,6 +125,15 @@ h1 { font-size: 34px; font-weight: 650; letter-spacing: -1.2px; line-height: 1.2
 .subtotal-denominations { color: #617157; font-size: 12px; }
 .subtotal-value { display: block; margin: 10px 0 8px; font-size: 38px; font-weight: 550; letter-spacing: -1px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .subtotal-formula { color: #617157; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.retention-group { min-width: 0; margin: 16px 0 0; padding: 0; border: 0; }
+.retention-group legend { padding: 0; font-size: 13px; font-weight: 600; }
+.retention-hint { margin-top: 5px; color: var(--muted); font-size: 11px; line-height: 1.6; }
+.retention-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+.retention-choice { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 48px; padding: 10px 8px; border: 1px solid #d9e1cb; border-radius: 10px; background: #fff; color: #456043; font-size: 14px; font-weight: 600; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.retention-choice.is-selected { border-color: #63866a; background: #dae6ca; color: #214e3f; }
+.retention-choice input { flex-shrink: 0; width: 20px; height: 20px; margin: 0; accent-color: var(--green); cursor: pointer; }
+.retention-save-status { margin-top: 10px; }
+.retention-save-status.storage-warning { color: #a23926; }
 .page-footer { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 8px; }
 .page-footer p { display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: 11px; }
 .page-footer p svg { width: 15px; height: 15px; color: #547051; }

@@ -1,9 +1,10 @@
-import { calculateNoteTotals, formatCents, parseNoteCount } from "./calculator.js";
+import { calculateNoteTotals, formatCents, parseNoteCount, NOTE_DENOMINATIONS, DEFAULT_RETAINED_DENOMINATIONS } from "./calculator.js";
 import { createAmountCalculator } from "./amount-calculator.js";
 import { installFocusScroll } from "./focus-scroll.js";
 import { copyAmount } from "./clipboard.js";
 import { cashAdjustmentFields } from "./cash-adjustments.js";
 import { createCoinCounter } from "./coin-counter.js";
+import { RETENTION_STORAGE_KEY, parseRetentionSelection } from "./note-retention.js";
 
 const configurations = {
   card: {
@@ -30,7 +31,7 @@ const configurations = {
   notes: {
     title: "澳元点钞", subtitle: "输入张数，快速合计", resultTitle: "纸币总额 · AUD",
     storageKey: "no3-note-counter:counts:v1",
-    fields: [100, 50, 20, 10, 5].map((value) => ({ id: `notes-${value}`, label: `$${value} 纸币张数`, denomination: value })),
+    fields: NOTE_DENOMINATIONS.map((value) => ({ id: `notes-${value}`, label: `$${value} 纸币张数`, denomination: value })),
     formula: "各面额 × 张数，再相加",
   },
 };
@@ -99,7 +100,18 @@ function createCalculator(name, config) {
   get(".subtotal-title").id = `${name}-subtotal-heading`;
   get(".subtotal-card").setAttribute("aria-labelledby", `${name}-subtotal-heading`);
   get(".subtotal-value").id = `${name}-subtotal`;
-  get(".subtotal-value").setAttribute("for", inputs.slice(2).map((input) => input.id).join(" "));
+  // Keep the paper total and retention visible before the optional coin section.
+  form.append(get(".result-card"), get(".subtotal-card"));
+  const retentionGroup = document.createElement("fieldset");
+  retentionGroup.className = "retention-group";
+  retentionGroup.innerHTML = `<legend>选择留存面额</legend>
+    <p class="retention-hint" id="retention-hint">勾选面额的全部纸币计入留存</p>
+    <div class="retention-options"></div>`;
+  get(".subtotal-card").append(retentionGroup);
+  const retentionStatus = document.createElement("p");
+  retentionStatus.className = "retention-hint retention-save-status";
+  retentionStatus.setAttribute("role", "status");
+  get(".subtotal-card").append(retentionStatus);
   const copyButton = get(".copy-button");
   const copyLabel = get(".copy-label");
   const actionStatus = get(".action-status");
@@ -109,6 +121,33 @@ function createCalculator(name, config) {
   let copyFeedbackTimer;
   let noteStorageAvailable = true;
   let coinStorageAvailable = true;
+  let retentionStorageAvailable = true;
+  let retainedDenominations = [...DEFAULT_RETAINED_DENOMINATIONS];
+  const retentionInputs = NOTE_DENOMINATIONS.map((denomination) => {
+    const label = document.createElement("label");
+    label.className = "retention-choice";
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.id = `retain-${denomination}`;
+    input.name = "retained-denominations";
+    input.value = String(denomination);
+    input.setAttribute("aria-label", `留存 $${denomination} 纸币`);
+    input.setAttribute("aria-describedby", "retention-hint");
+    const text = document.createElement("span");
+    text.textContent = `$${denomination}`;
+    label.append(input, text);
+    retentionGroup.querySelector(".retention-options").append(label);
+    input.addEventListener("change", () => {
+      retainedDenominations = retentionInputs.filter((item) => item.checked).map((item) => Number(item.value));
+      update();
+      try {
+        localStorage.setItem(RETENTION_STORAGE_KEY, JSON.stringify({ version: 1, denominations: retainedDenominations }));
+        retentionStorageAvailable = true;
+      } catch { retentionStorageAvailable = false; }
+      showStorageStatus(noteStorageAvailable);
+    });
+    return input;
+  });
   const coinCounter = createCoinCounter(form, {
     getSummaryAmounts: () => ({ cardCents: calculators.card?.getTotalCents() ?? null, noteCents: currentTotal, retainedCents }),
     onChange: () => {
@@ -123,10 +162,12 @@ function createCalculator(name, config) {
 
   function showStorageStatus(available) {
     noteStorageAvailable = available;
-    available &&= coinStorageAvailable;
+    available &&= coinStorageAvailable && retentionStorageAvailable;
     const message = available ? "本页输入自动保存在此浏览器" : "浏览器无法保存，关闭后输入可能丢失";
     if (storageStatus.textContent !== message) storageStatus.textContent = message;
     storageStatus.classList.toggle("storage-warning", !available);
+    retentionStatus.textContent = retentionStorageAvailable ? "选择自动保存，清空数量时保留" : "留存设置无法保存，重新打开后可能丢失";
+    retentionStatus.classList.toggle("storage-warning", !retentionStorageAvailable);
   }
 
   function saveInputs() {
@@ -141,6 +182,10 @@ function createCalculator(name, config) {
   }
 
   function restoreInputs() {
+    try {
+      retainedDenominations = parseRetentionSelection(localStorage.getItem(RETENTION_STORAGE_KEY)) ?? [...DEFAULT_RETAINED_DENOMINATIONS];
+      retentionStorageAvailable = true;
+    } catch { retentionStorageAvailable = false; }
     coinCounter.restore();
     let savedText;
     try {
@@ -165,6 +210,12 @@ function createCalculator(name, config) {
     clearTimeout(copyFeedbackTimer);
     copyLabel.textContent = "复制结果";
     actionStatus.textContent = "";
+    retentionInputs.forEach((input) => {
+      input.checked = retainedDenominations.includes(Number(input.value));
+      input.closest("label").classList.toggle("is-selected", input.checked);
+    });
+    get(".subtotal-denominations").textContent = retainedDenominations.length ? `已选 ${retainedDenominations.length} 种` : "未选择";
+    get(".subtotal-value").setAttribute("for", retainedDenominations.map((value) => `notes-${value}`).join(" "));
     const amounts = inputs.map((input) => {
       const amount = parse(input.value);
       const error = get(`#${input.id}-error`);
@@ -190,13 +241,13 @@ function createCalculator(name, config) {
     }
 
     const counts = amounts.map((amount) => amount.count);
-    const totals = calculateNoteTotals(counts);
+    const totals = calculateNoteTotals(counts, retainedDenominations);
     currentTotal = totals.totalCents;
-    retainedCents = totals.smallNotesCents;
+    retainedCents = totals.retainedCents;
     const terms = counts.map((count, index) => `$${config.fields[index].denomination} × ${count}`);
     get(".formula-values").textContent = terms.join(" + ");
-    get(".subtotal-value").textContent = formatCents(totals.smallNotesCents, true);
-    get(".subtotal-formula").textContent = terms.slice(2).join(" + ");
+    get(".subtotal-value").textContent = formatCents(retainedCents, true);
+    get(".subtotal-formula").textContent = terms.filter((_, index) => retainedDenominations.includes(config.fields[index].denomination)).join(" + ") || "未选择留存面额";
     result.textContent = formatCents(currentTotal, true);
     syncCashDrawer(currentTotal);
     coinCounter.refreshSummary();
